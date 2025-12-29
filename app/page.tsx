@@ -136,11 +136,7 @@ export default function HomePage() {
             →
           </Button>
         </div>
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="secondary" onClick={onRefresh} disabled={isRefreshing} aria-label="Refresh events">
-            {isRefreshing ? "Refreshing…" : "Refresh"}
-          </Button>
-        </div>
+        <div />
       </div>
       {sidebarOpen && (
         <>
@@ -156,11 +152,17 @@ export default function HomePage() {
           >
             <div className="p-3 border-b flex items-center justify-between">
               <div className="font-semibold">Calendars</div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="secondary" onClick={() => setSelectedCalendarIds(calendars.map((c) => c.id))}>
-                  Select all
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-[24px] leading-none"
+                aria-label="Refresh events"
+                title={isRefreshing ? "Refreshing…" : "Refresh events"}
+                onClick={onRefresh}
+                disabled={isRefreshing}
+              >
+                ⟳
+              </Button>
             </div>
             <div className="flex-1 min-h-0 overflow-auto p-2 space-y-1">
               {status === "authenticated" ? (
