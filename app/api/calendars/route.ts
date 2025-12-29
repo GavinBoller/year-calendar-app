@@ -5,7 +5,9 @@ import { getFreshGoogleAccountsForUser } from "@/lib/google-accounts";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const debug = url.searchParams.get("debug") === "1";
   const session = await getServerSession(authOptions);
   if (!(session as any)?.user?.id) {
     return NextResponse.json({ calendars: [] }, { status: 200 });
@@ -21,9 +23,27 @@ export async function GET() {
       headers: { Authorization: `Bearer ${acc.accessToken}` },
       cache: "no-store",
     });
-    if (!res.ok) return { items: [] as any[] };
+    const status = res.status;
+    if (!res.ok) {
+      let error: string | undefined;
+      try {
+        const errJson = await res.json();
+        error = errJson?.error?.message || errJson?.error_description;
+      } catch {}
+      return {
+        items: [] as any[],
+        accountId: acc.accountId,
+        email: acc.email,
+        _debug: debug ? { status, error } : undefined,
+      };
+    }
     const data = await res.json();
-    return { items: data.items || [], accountId: acc.accountId, email: acc.email };
+    return {
+      items: data.items || [],
+      accountId: acc.accountId,
+      email: acc.email,
+      _debug: debug ? { status } : undefined,
+    };
   });
   const results = await Promise.all(fetches);
   const calendars = results.flatMap((r) =>
@@ -38,6 +58,13 @@ export async function GET() {
       accessRole: c.accessRole as string | undefined,
     }))
   );
+  if (debug) {
+    const diag = results.map((r) => ({
+      accountId: (r as any).accountId,
+      ...(r as any)._debug,
+    }));
+    return NextResponse.json({ calendars, debug: diag });
+  }
   return NextResponse.json({ calendars });
 }
 
