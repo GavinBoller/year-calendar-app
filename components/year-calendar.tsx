@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo } from "react";
-import { cn } from "@/lib/utils";
+import { cn, formatDateKey } from "@/lib/utils";
 import {
   Calendar as CalendarIcon,
   X,
@@ -18,30 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AllDayEvent, CalendarListItem } from "@/types/calendar";
 
-export type AllDayEvent = {
-  id: string;
-  summary: string;
-  startDate: string; // YYYY-MM-DD
-  endDate: string; // YYYY-MM-DD (exclusive)
-  calendarId?: string;
-};
-
-export type CalendarListItem = {
-  id: string;
-  summary: string;
-  primary?: boolean;
-  backgroundColor?: string;
-  accountEmail?: string;
-  accessRole?: string;
-};
-
-function formatDateKey(date: Date) {
-  const y = date.getFullYear();
-  const m = `${date.getMonth() + 1}`.padStart(2, "0");
-  const d = `${date.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+export type { AllDayEvent, CalendarListItem };
 function expandEventsToDateMap(events: AllDayEvent[]) {
   const map = new Map<string, AllDayEvent[]>();
   for (const ev of events) {
@@ -755,130 +734,6 @@ export function YearCalendar({
             </div>
           </div>
         </>
-      )}
-      {popover.event && !isEditing && (
-        <div
-          ref={popoverRef}
-          className="fixed z-50 w-80 max-w-[90vw] rounded-md border bg-card shadow-lg"
-          style={{
-            top: popover.y,
-            left: popover.x,
-            transform: "translateX(-50%)",
-          }}
-          role="dialog"
-          aria-label="Event details"
-        >
-          <div className="px-3 py-2 flex items-center justify-between">
-            <div className="font-medium truncate flex-1">
-              {popover.event.summary}
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="relative" ref={menuRef}>
-                <button
-                  className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuOpen(!menuOpen);
-                  }}
-                  aria-label="More options"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-                {menuOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-card border rounded-md shadow-lg z-50 py-1">
-                    {onUpdateEvent && writableCalendars.length > 0 && (
-                      <button
-                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsEditing(true);
-                          setMenuOpen(false);
-                        }}
-                      >
-                        Edit
-                      </button>
-                    )}
-                    <button
-                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onHideEvent && popover.event) {
-                          onHideEvent(popover.event.id);
-                        }
-                        setPopover({ event: null, x: 0, y: 0 });
-                        setMenuOpen(false);
-                      }}
-                    >
-                      Hide event
-                    </button>
-                    {onDeleteEvent && popover.event && (
-                      <button
-                        className="w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-destructive hover:text-destructive-foreground transition"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const id = popover.event?.id;
-                          if (!id) return;
-                          const ok =
-                            typeof window !== "undefined"
-                              ? window.confirm("Delete this event?")
-                              : true;
-                          if (!ok) return;
-                          try {
-                            await onDeleteEvent(id);
-                          } finally {
-                            setPopover({ event: null, x: 0, y: 0 });
-                            setMenuOpen(false);
-                          }
-                        }}
-                      >
-                        Delete event
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-              <button
-                className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
-                onClick={() => setPopover({ event: null, x: 0, y: 0 })}
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-          <div className="px-3 text-sm text-muted-foreground flex items-center gap-2">
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-full"
-              style={{
-                backgroundColor:
-                  (popover.event.calendarId &&
-                    calendarColors[popover.event.calendarId]) ||
-                  "hsl(var(--secondary))",
-              }}
-            />
-            <span className="truncate">
-              {(popover.event.calendarId &&
-                calendarNames[popover.event.calendarId]) ||
-                "Calendar"}
-              {popover.event.calendarId &&
-                calendarAccounts &&
-                calendarAccounts[popover.event.calendarId] && (
-                  <span className="ml-1 text-muted-foreground">
-                    ({calendarAccounts[popover.event.calendarId]})
-                  </span>
-                )}
-            </span>
-          </div>
-          <div className="px-3 pb-3 mt-1.5 text-sm text-muted-foreground flex items-center gap-2">
-            <CalendarIcon className="h-2.5 w-2.5" />
-            <span>
-              {formatDisplayRange(
-                popover.event.startDate,
-                popover.event.endDate
-              )}
-            </span>
-          </div>
-        </div>
       )}
       {popover.event && !isEditing && (
         <div

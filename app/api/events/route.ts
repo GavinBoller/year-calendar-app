@@ -1,98 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getFreshGoogleAccountsForUser } from "@/lib/google-accounts";
+import { mergeAccountsFromDbAndSession, refreshGoogleAccessToken, fetchWithAutoRefresh } from "@/lib/google-accounts";
 
 export const dynamic = "force-dynamic";
-
-async function refreshGoogleAccessToken(refreshToken: string) {
-  const params = new URLSearchParams({
-    client_id: process.env.GOOGLE_CLIENT_ID!,
-    client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-    grant_type: "refresh_token",
-    refresh_token: refreshToken,
-  });
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params.toString(),
-    cache: "no-store",
-  });
-  const data = await res.json();
-  if (!res.ok) throw data;
-  return {
-    accessToken: data.access_token as string,
-    expiresAtMs: Date.now() + (data.expires_in ? data.expires_in * 1000 : 3600 * 1000),
-    refreshToken: (data.refresh_token as string) || undefined,
-  };
-}
-
-async function mergeAccountsFromDbAndSession(userId: string, session: any) {
-  // Load DB accounts (may refresh and persist)
-  const dbModule = await import("@/lib/google-accounts");
-  const dbAccounts = await dbModule.getFreshGoogleAccountsForUser(userId);
-  const sessAccs = Array.isArray(session?.googleAccounts) ? (session.googleAccounts as any[]) : [];
-  const byId = new Map<
-    string,
-    {
-      accountId: string;
-      email?: string;
-      accessToken?: string;
-      refreshToken?: string;
-      accessTokenExpires?: number;
-      source: "db" | "session";
-    }
-  >();
-  for (const a of dbAccounts) {
-    byId.set(a.accountId, { ...a, source: "db" });
-  }
-  for (const a of sessAccs) {
-    const existing = byId.get(a.accountId as string);
-    const cand = {
-      accountId: a.accountId as string,
-      email: a.email as string | undefined,
-      accessToken: a.accessToken as string | undefined,
-      refreshToken: a.refreshToken as string | undefined,
-      accessTokenExpires: a.accessTokenExpires as number | undefined,
-      source: "session" as const,
-    };
-    if (!existing) {
-      byId.set(cand.accountId, cand);
-    } else {
-      const preferSess =
-        (!!cand.refreshToken && !existing.refreshToken) ||
-        ((cand.accessTokenExpires || 0) > (existing.accessTokenExpires || 0));
-      if (preferSess) byId.set(cand.accountId, cand);
-    }
-  }
-  const now = Date.now() + 60_000;
-  const merged: any[] = [];
-  for (const entry of byId.values()) {
-    let accessToken = entry.accessToken;
-    let refreshToken = entry.refreshToken;
-    let expiresAtMs = entry.accessTokenExpires;
-    if ((!expiresAtMs || expiresAtMs < now) && refreshToken) {
-      try {
-        const refreshed = await refreshGoogleAccessToken(refreshToken);
-        accessToken = refreshed.accessToken;
-        expiresAtMs = refreshed.expiresAtMs;
-        refreshToken = refreshed.refreshToken ?? refreshToken;
-      } catch {
-        // keep existing token on refresh failure
-      }
-    }
-    if (accessToken) {
-      merged.push({
-        accountId: entry.accountId,
-        email: entry.email,
-        accessToken,
-        refreshToken,
-        accessTokenExpires: expiresAtMs,
-      });
-    }
-  }
-  return merged;
-}
 
 function startOfYearIso(year: number) {
   return new Date(Date.UTC(year, 0, 1)).toISOString();
@@ -336,21 +247,11 @@ export async function DELETE(req: Request) {
   const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
     calendarId
   )}/events/${encodeURIComponent(eventId)}`;
-  let res = await fetch(url, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${account.accessToken}` },
-    cache: "no-store",
-  });
-  if (res.status === 401 && account.refreshToken) {
-    try {
-      const refreshed = await refreshGoogleAccessToken(account.refreshToken);
-      res = await fetch(url, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${refreshed.accessToken}` },
-        cache: "no-store",
-      });
-    } catch {}
-  }
+  const { response: res } = await fetchWithAutoRefresh(
+    url,
+    { method: "DELETE" },
+    account
+  );
   if (!res.ok && res.status !== 204) {
     let errText = "Failed to delete event";
     try {

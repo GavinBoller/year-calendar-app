@@ -23,28 +23,15 @@ import {
   Clock,
   Calendar as CalendarIcon,
 } from "lucide-react";
+import { formatDateKey } from "@/lib/utils";
+import { CalendarListItem } from "@/types/calendar";
 
-type CalendarListItem = {
-  id: string;
-  summary: string;
-  primary?: boolean;
-  backgroundColor?: string;
-  accountEmail?: string;
-  accessRole?: string;
-};
 type LinkedAccount = {
   accountId: string;
   email?: string;
   status?: number;
   error?: string;
 };
-
-function isoDateOnlyFromDate(d: Date) {
-  const y = d.getFullYear();
-  const m = `${d.getMonth() + 1}`.padStart(2, "0");
-  const day = `${d.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 export default function HomePage() {
   const { data: session, status } = useSession();
@@ -75,44 +62,24 @@ export default function HomePage() {
   const startDateInputRef = useRef<HTMLInputElement | null>(null);
   const endDateInputRef = useRef<HTMLInputElement | null>(null);
   const preferencesLoaded = useRef<boolean>(false);
-  const writableCalendars = useMemo(() => {
-    const canWrite = new Set(["owner", "writer"]);
-    return calendars.filter((c) =>
-      c.accessRole ? canWrite.has(c.accessRole) : false
-    );
-  }, [calendars]);
-  const writableAccountsWithCalendars = useMemo(() => {
-    const writableSet = new Set(writableCalendars.map((c) => c.id));
-    if (accounts.length > 0) {
-      return accounts
-        .map((acc) => ({
-          accountId: acc.accountId,
-          email: acc.email || "Other",
-          list: writableCalendars.filter((c) =>
-            c.id.startsWith(`${acc.accountId}|`)
-          ),
-        }))
-        .filter((group) => group.list.length > 0);
+
+  const mergeCalendarColorsWithDefaults = (
+    calendars: CalendarListItem[],
+    existingColors: Record<string, string>
+  ): Record<string, string> => {
+    const next: Record<string, string> = { ...existingColors };
+    for (const c of calendars) {
+      if (!next[c.id]) {
+        next[c.id] = c.backgroundColor || "#cbd5e1";
+      }
     }
-    // Fallback grouping if accounts not provided
-    const map = new Map<string, CalendarListItem[]>();
-    const emailByAcc = new Map<string, string>();
-    for (const c of writableCalendars) {
-      const accId = c.id.includes("|") ? c.id.split("|")[0] : "";
-      const email = c.accountEmail || "Other";
-      emailByAcc.set(accId, email);
-      const key = accId || email;
-      const arr = map.get(key) ?? [];
-      arr.push(c);
-      map.set(key, arr);
-    }
-    return Array.from(map.entries()).map(([key, list]) => ({
-      accountId: key,
-      email: emailByAcc.get(key) || "Other",
-      list,
-    }));
-  }, [writableCalendars, accounts]);
-  const accountsWithCalendars = useMemo(() => {
+    return next;
+  };
+
+  const groupCalendarsByAccount = (
+    calendars: CalendarListItem[],
+    accounts: LinkedAccount[]
+  ): Array<{ accountId: string; email: string; list: CalendarListItem[] }> => {
     if (accounts.length > 0) {
       return accounts.map((acc) => ({
         accountId: acc.accountId,
@@ -137,6 +104,102 @@ export default function HomePage() {
       email: emailByAcc.get(key) || "Other",
       list,
     }));
+  };
+
+  const extractAccountIdFromCalendarId = (calendarId: string): string => {
+    return calendarId.includes("|") ? calendarId.split("|")[0] : "";
+  };
+
+  const getAccountIdsFromCalendars = (
+    calendars: CalendarListItem[]
+  ): string[] => {
+    return Array.from(
+      new Set(
+        calendars
+          .map((c) => extractAccountIdFromCalendarId(c.id))
+          .filter(Boolean)
+      )
+    );
+  };
+
+  const handleLinkingReturnCalendarSelection = (
+    list: CalendarListItem[],
+    selectedCalendarIds: string[],
+    allIds: string[]
+  ): string[] => {
+    let beforeIds: string[] = [];
+    try {
+      beforeIds =
+        JSON.parse(localStorage.getItem("preLinkAccountIds") || "[]") || [];
+    } catch {}
+    const beforeSet = new Set(beforeIds);
+    const currentAccountIds = getAccountIdsFromCalendars(list);
+    const newAccountIdSet = new Set(
+      currentAccountIds.filter((id) => !beforeSet.has(id))
+    );
+    const currentFiltered = selectedCalendarIds.filter((id) =>
+      allIds.includes(id)
+    );
+    const toAdd = list
+      .filter((c) => {
+        const accId = extractAccountIdFromCalendarId(c.id);
+        return accId && newAccountIdSet.has(accId);
+      })
+      .map((c) => c.id);
+    return Array.from(new Set([...currentFiltered, ...toAdd]));
+  };
+
+  const handleNormalLoadCalendarSelection = (
+    list: CalendarListItem[],
+    selectedCalendarIds: string[],
+    allIds: string[],
+    preferencesLoaded: boolean
+  ): string[] => {
+    const validCurrent = selectedCalendarIds.filter((id) =>
+      allIds.includes(id)
+    );
+
+    // Check for new accounts
+    const currentAccIds = new Set(
+      validCurrent
+        .map((id) => extractAccountIdFromCalendarId(id))
+        .filter(Boolean)
+    );
+    const allAccIds = getAccountIdsFromCalendars(list);
+    const newAccIds = allAccIds.filter((id) => !currentAccIds.has(id));
+
+    if (preferencesLoaded) {
+      // Preferences loaded - filter invalid and add new accounts
+      if (newAccIds.length > 0) {
+        const toAdd = list
+          .filter((c) => {
+            const accId = extractAccountIdFromCalendarId(c.id);
+            return accId && newAccIds.includes(accId);
+          })
+          .map((c) => c.id);
+        return Array.from(new Set([...validCurrent, ...toAdd]));
+      } else {
+        // Just filter invalid calendars
+        return validCurrent;
+      }
+    } else {
+      // Preferences not loaded yet - first time user, auto-select all
+      return allIds;
+    }
+  };
+
+  const writableCalendars = useMemo(() => {
+    const canWrite = new Set(["owner", "writer"]);
+    return calendars.filter((c) =>
+      c.accessRole ? canWrite.has(c.accessRole) : false
+    );
+  }, [calendars]);
+  const writableAccountsWithCalendars = useMemo(() => {
+    const grouped = groupCalendarsByAccount(writableCalendars, accounts);
+    return grouped.filter((group) => group.list.length > 0);
+  }, [writableCalendars, accounts]);
+  const accountsWithCalendars = useMemo(() => {
+    return groupCalendarsByAccount(calendars, accounts);
   }, [accounts, calendars]);
   const calendarNames = useMemo(() => {
     const map: Record<string, string> = {};
@@ -184,21 +247,6 @@ export default function HomePage() {
       preferencesLoaded.current = false;
     }
   }, [status]);
-  // Load showHidden from storage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("showHidden");
-      if (stored !== null) {
-        setShowHidden(stored === "true");
-      }
-    } catch {}
-  }, []);
-  // Persist showHidden
-  useEffect(() => {
-    try {
-      localStorage.setItem("showHidden", JSON.stringify(showHidden));
-    } catch {}
-  }, [showHidden]);
 
   const visibleEvents = useMemo(() => {
     if (showHidden) return events;
@@ -269,36 +317,15 @@ export default function HomePage() {
         const isLinkingReturn =
           !!url && url.searchParams.get("linkingAccount") === "1";
 
+        let newSelection: string[];
         if (isLinkingReturn) {
           // Linking return: add calendars from new accounts
-          let beforeIds: string[] = [];
-          try {
-            beforeIds =
-              JSON.parse(localStorage.getItem("preLinkAccountIds") || "[]") ||
-              [];
-          } catch {}
-          const beforeSet = new Set(beforeIds);
-          const currentAccountIds = Array.from(
-            new Set(
-              list
-                .map((c) => (c.id.includes("|") ? c.id.split("|")[0] : ""))
-                .filter(Boolean)
-            )
+          newSelection = handleLinkingReturnCalendarSelection(
+            list,
+            selectedCalendarIds,
+            allIds
           );
-          const newAccountIdSet = new Set(
-            currentAccountIds.filter((id) => !beforeSet.has(id))
-          );
-          const currentFiltered = selectedCalendarIds.filter((id) =>
-            allIds.includes(id)
-          );
-          const toAdd = list
-            .filter((c) => {
-              const accId = c.id.includes("|") ? c.id.split("|")[0] : "";
-              return accId && newAccountIdSet.has(accId);
-            })
-            .map((c) => c.id);
-          const merged = Array.from(new Set([...currentFiltered, ...toAdd]));
-          setSelectedCalendarIds(merged);
+          setSelectedCalendarIds(newSelection);
           // Cleanup
           try {
             localStorage.removeItem("preLinkAccountIds");
@@ -309,63 +336,23 @@ export default function HomePage() {
           }
         } else {
           // Normal load: filter invalid calendars and add new account calendars
-          const validCurrent = selectedCalendarIds.filter((id) =>
-            allIds.includes(id)
+          newSelection = handleNormalLoadCalendarSelection(
+            list,
+            selectedCalendarIds,
+            allIds,
+            preferencesLoaded.current
           );
-
-          // Check for new accounts
-          const currentAccIds = new Set(
-            validCurrent
-              .map((id) => (id.includes("|") ? id.split("|")[0] : ""))
-              .filter(Boolean)
-          );
-          const allAccIds = Array.from(
-            new Set(
-              list
-                .map((c) => (c.id.includes("|") ? c.id.split("|")[0] : ""))
-                .filter(Boolean)
-            )
-          );
-          const newAccIds = allAccIds.filter((id) => !currentAccIds.has(id));
-
-          if (preferencesLoaded.current) {
-            // Preferences loaded - filter invalid and add new accounts
-            if (newAccIds.length > 0) {
-              const toAdd = list
-                .filter((c) => {
-                  const accId = c.id.includes("|") ? c.id.split("|")[0] : "";
-                  return accId && newAccIds.includes(accId);
-                })
-                .map((c) => c.id);
-              const merged = Array.from(new Set([...validCurrent, ...toAdd]));
-              if (
-                merged.length !== selectedCalendarIds.length ||
-                !merged.every((id) => selectedCalendarIds.includes(id))
-              ) {
-                setSelectedCalendarIds(merged);
-              }
-            } else {
-              // Just filter invalid calendars
-              if (
-                validCurrent.length !== selectedCalendarIds.length ||
-                !validCurrent.every((id) => selectedCalendarIds.includes(id))
-              ) {
-                setSelectedCalendarIds(validCurrent);
-              }
-            }
-          } else {
-            // Preferences not loaded yet - first time user, auto-select all
-            setSelectedCalendarIds(allIds);
+          // Only update if selection actually changed
+          if (
+            newSelection.length !== selectedCalendarIds.length ||
+            !newSelection.every((id) => selectedCalendarIds.includes(id))
+          ) {
+            setSelectedCalendarIds(newSelection);
           }
         }
 
         // Update calendar colors (merge with existing, add defaults for new calendars)
-        const next: Record<string, string> = { ...calendarColors };
-        for (const c of list) {
-          if (!next[c.id]) {
-            next[c.id] = c.backgroundColor || "#cbd5e1";
-          }
-        }
+        const next = mergeCalendarColorsWithDefaults(list, calendarColors);
         if (JSON.stringify(next) !== JSON.stringify(calendarColors)) {
           setCalendarColors(next);
         }
@@ -396,7 +383,7 @@ export default function HomePage() {
       const now = new Date();
       const defaultDate =
         now.getFullYear() === year ? now : new Date(year, 0, 1);
-      setCreateStartDate(isoDateOnlyFromDate(defaultDate));
+      setCreateStartDate(formatDateKey(defaultDate));
     }
     // Prefer a writable primary calendar; else first writable; else first overall.
     const primaryWritable = writableCalendars.find((c) => c.primary)?.id;
@@ -472,11 +459,10 @@ export default function HomePage() {
       );
       setSelectedCalendarIds(mergedSelected);
       // Merge default colors for any new calendars
-      const nextColors: Record<string, string> = { ...calendarColors };
-      for (const c of newCalendars) {
-        if (!nextColors[c.id])
-          nextColors[c.id] = c.backgroundColor || "#cbd5e1";
-      }
+      const nextColors = mergeCalendarColorsWithDefaults(
+        newCalendars,
+        calendarColors
+      );
       setCalendarColors(nextColors);
       // 2) Reload events for the current year using the merged selection
       const qs = `/api/events?year=${year}${
@@ -903,20 +889,18 @@ export default function HomePage() {
                       <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                         {email && email.length ? email : accountId || "Account"}
                       </div>
-                      {true && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                          aria-label={`Disconnect ${email}`}
-                          title={`Disconnect ${email}`}
-                          onClick={() => {
-                            disconnectAccount(accountId);
-                          }}
-                        >
-                          <Unlink className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                        aria-label={`Disconnect ${email}`}
+                        title={`Disconnect ${email}`}
+                        onClick={() => {
+                          disconnectAccount(accountId);
+                        }}
+                      >
+                        <Unlink className="h-4 w-4" />
+                      </Button>
                     </div>
                     {list.map((c) => {
                       const checked = selectedCalendarIds.includes(c.id);
@@ -952,12 +936,6 @@ export default function HomePage() {
                                 [c.id]: e.target.value,
                               };
                               setCalendarColors(next);
-                              try {
-                                localStorage.setItem(
-                                  "calendarColors",
-                                  JSON.stringify(next)
-                                );
-                              } catch {}
                             }}
                             className="h-5 w-5 rounded border p-0"
                             aria-label={`Color for ${c.summary}`}
