@@ -142,34 +142,8 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile, email }) {
-      // Allow linking Microsoft accounts to existing users
-      if (account?.provider === "azure-ad") {
-        try {
-          // Check if there's already an Account record for this Microsoft account
-          const existingAccount = await prisma.account.findUnique({
-            where: {
-              provider_providerAccountId: {
-                provider: "azure-ad",
-                providerAccountId: account.providerAccountId,
-              },
-            },
-          });
-
-          if (existingAccount) {
-            // Account already exists, allow sign-in
-            return true;
-          }
-
-          // If no existing account, this is either:
-          // 1. A new user signing in for the first time with Microsoft
-          // 2. An existing user trying to link a Microsoft account
-          // In both cases, allow the sign-in - NextAuth will handle account creation/linking
-          return true;
-        } catch (error) {
-          console.error("Error in signIn callback:", error);
-          return false;
-        }
-      }
+      // Allow all sign-ins for now to debug
+      console.log("SignIn callback:", { provider: account?.provider, email: user?.email });
       return true;
     },
     async jwt({ token, account, user }) {
