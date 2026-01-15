@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
+    "@types/pg": "^8.16.0",
     "@types/react": "19.2.7",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",

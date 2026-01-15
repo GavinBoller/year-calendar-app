@@ -1,20 +1,10 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-
-const connectionString = process.env.DATABASE_URL;
-
-// NOTE: For production, you'll want to use a connection pooler like PgBouncer
-// to avoid connection limits. For development, you can use a single connection.
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
 
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    adapter,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
