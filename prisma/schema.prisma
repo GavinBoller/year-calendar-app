@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // NextAuth standard schema
@@ -33,6 +32,7 @@ model Account {
   id_token          String? @map("id_token")
   refresh_token_expires_in Int? @map("refresh_token_expires_in")
   session_state     String?
+  ext_expires_in    Int?    @map("ext_expires_in")
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
@@ -65,5 +65,3 @@ model UserPreferences {
   calendarColors    String   @default("{}") // JSON object
   updatedAt          DateTime @updatedAt
 }
-
-

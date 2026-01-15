@@ -1,6 +1,6 @@
 import NextAuth, { type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { PrismaAdapter } from "@auth/prisma-adapter";
+import MicrosoftProvider from "next-auth/providers/azure-ad";
 // @ts-ignore - ESM interop
 import { prisma } from "./prisma";
 
@@ -67,7 +67,7 @@ async function refreshSingleGoogleAccount(account: any) {
     const data = await res.json();
     if (!res.ok) throw data;
     return {
-      ...account,
+      ...account, // Preserve all original fields including provider
       accessToken: data.access_token,
       accessTokenExpires: Date.now() + data.expires_in * 1000,
       refreshToken: account.refreshToken ?? data.refresh_token,
@@ -77,8 +77,43 @@ async function refreshSingleGoogleAccount(account: any) {
   }
 }
 
+async function refreshSingleMicrosoftAccount(account: any) {
+  try {
+    if (!account.refreshToken) return account;
+    const params = new URLSearchParams({
+      client_id: process.env.MICROSOFT_CLIENT_ID!,
+      client_secret: process.env.MICROSOFT_CLIENT_SECRET!,
+      grant_type: "refresh_token",
+      refresh_token: account.refreshToken as string,
+    });
+    const res = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw data;
+    return {
+      ...account, // Preserve all original fields including provider
+      accessToken: data.access_token,
+      accessTokenExpires: Date.now() + data.expires_in * 1000,
+      refreshToken: account.refreshToken ?? data.refresh_token,
+    };
+  } catch (e) {
+    return { ...account, error: "RefreshAccessTokenError" as const };
+  }
+}
+
+async function refreshSingleAccount(account: any) {
+  if (account.provider === "google") {
+    return await refreshSingleGoogleAccount(account);
+  } else if (account.provider === "azure-ad") {
+    return await refreshSingleMicrosoftAccount(account);
+  }
+  return account;
+}
+
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -94,10 +129,86 @@ export const authOptions: NextAuthOptions = {
         },
       } as any,
     }),
+    MicrosoftProvider({
+      clientId: process.env.MICROSOFT_CLIENT_ID!,
+      clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
+      tenantId: "common",
+      authorization: {
+        params: {
+          scope: "openid email profile https://graph.microsoft.com/Calendars.Read https://graph.microsoft.com/Calendars.ReadWrite offline_access",
+        },
+      } as any,
+    }),
   ],
   callbacks: {
+    async signIn({ user, account, profile, email }) {
+      // Allow linking Microsoft accounts to existing users
+      if (account?.provider === "azure-ad") {
+        try {
+          // Check if there's already an Account record for this Microsoft account
+          const existingAccount = await prisma.account.findUnique({
+            where: {
+              provider_providerAccountId: {
+                provider: "azure-ad",
+                providerAccountId: account.providerAccountId,
+              },
+            },
+          });
+
+          if (existingAccount) {
+            // Account already exists, allow sign-in
+            return true;
+          }
+
+          // If no existing account, this is either:
+          // 1. A new user signing in for the first time with Microsoft
+          // 2. An existing user trying to link a Microsoft account
+          // In both cases, allow the sign-in - NextAuth will handle account creation/linking
+          return true;
+        } catch (error) {
+          console.error("Error in signIn callback:", error);
+          return false;
+        }
+      }
+      return true;
+    },
     async jwt({ token, account, user }) {
-      // When a (re)sign-in occurs, add/update this Google account in the token.googleAccounts array.
+      console.log("JWT callback - token.dbUserId:", (token as any).dbUserId, "user:", user, "account:", account?.provider);
+
+      // Ensure user exists in database
+      if (user && !token.dbUserId) {
+        try {
+          // For Microsoft, email might be in profile or need to be extracted differently
+          const userEmail = user.email || (user as any).profile?.email || (user as any).profile?.mail;
+          const userName = user.name || (user as any).profile?.name || (user as any).profile?.displayName;
+          const userImage = user.image || (user as any).profile?.picture;
+
+          console.log("Attempting to create user with email:", userEmail, "name:", userName);
+
+          if (userEmail) {
+            const dbUser = await prisma.user.upsert({
+              where: { email: userEmail },
+              update: {
+                name: userName,
+                image: userImage,
+              },
+              create: {
+                email: userEmail,
+                name: userName,
+                image: userImage,
+              },
+            });
+            token.dbUserId = dbUser.id;
+            console.log("Created/found user:", dbUser.id, dbUser.email);
+          } else {
+            console.log("No email found in user object:", user);
+          }
+        } catch (error) {
+          console.error("Error creating user:", error);
+        }
+      }
+
+      // When a (re)sign-in occurs, add/update this account in the appropriate array.
       if (account) {
         const expiresInSecRaw = (account as any)?.expires_in;
         const expiresInSec =
@@ -111,17 +222,37 @@ export const authOptions: NextAuthOptions = {
         const acctEmail =
           emailFromIdToken((account as any)?.id_token as string | undefined) ||
           (user?.email as string | undefined);
-        const existing = (token.googleAccounts as any[]) || [];
-        const updated = existing.filter((a) => a.accountId !== acctId);
-        updated.push({
-          accountId: acctId,
-          email: acctEmail,
-          accessToken: account.access_token as string,
-          refreshToken: (account.refresh_token as string) || undefined,
-          accessTokenExpires:
-            Date.now() + (expiresInSec ? expiresInSec * 1000 : 3600 * 1000),
-        });
-        token.googleAccounts = updated;
+
+        if (account.provider === "google") {
+          const existing = (token.googleAccounts as any[]) || [];
+          const updated = existing.filter((a) => a.accountId !== acctId);
+          updated.push({
+            provider: account.provider,
+            accountId: acctId,
+            email: acctEmail,
+            accessToken: account.access_token as string,
+            refreshToken: (account.refresh_token as string) || undefined,
+            accessTokenExpires:
+              Date.now() + (expiresInSec ? expiresInSec * 1000 : 3600 * 1000),
+          });
+          token.googleAccounts = updated;
+        } else if (account.provider === "azure-ad") {
+          console.log("Adding Microsoft account to token:", { acctId, acctEmail, hasAccessToken: !!account.access_token });
+          const existing = (token.microsoftAccounts as any[]) || [];
+          const updated = existing.filter((a) => a.accountId !== acctId);
+          updated.push({
+            provider: account.provider,
+            accountId: acctId,
+            email: acctEmail,
+            accessToken: account.access_token as string,
+            refreshToken: (account.refresh_token as string) || undefined,
+            accessTokenExpires:
+              Date.now() + (expiresInSec ? expiresInSec * 1000 : 3600 * 1000),
+          });
+          token.microsoftAccounts = updated;
+          console.log("Microsoft accounts in token:", token.microsoftAccounts);
+        }
+
         // Keep backward compat single-token fields to the latest account
         token.accessToken = account.access_token as string;
         token.refreshToken = (account.refresh_token as string) || token.refreshToken;
@@ -130,17 +261,31 @@ export const authOptions: NextAuthOptions = {
         token.user = user;
         return token;
       }
-      // Refresh any google accounts that are expiring.
-      if (Array.isArray(token.googleAccounts) && token.googleAccounts.length > 0) {
+
+      // Refresh any accounts that are expiring.
+      const allAccounts = [
+        ...(Array.isArray(token.googleAccounts) ? token.googleAccounts : []),
+        ...(Array.isArray(token.microsoftAccounts) ? token.microsoftAccounts : []),
+      ];
+
+      console.log("JWT refresh - allAccounts length:", allAccounts.length, "microsoft accounts:", token.microsoftAccounts);
+
+      if (allAccounts.length > 0) {
         const now = Date.now() + 60_000; // 1 min buffer
         const refreshed = await Promise.all(
-          token.googleAccounts.map((a: any) =>
+          allAccounts.map((a: any) =>
             a.accessTokenExpires && a.accessTokenExpires > now
               ? a
-              : refreshSingleGoogleAccount(a)
+              : refreshSingleAccount(a)
           )
         );
-        token.googleAccounts = refreshed;
+
+        // Split back into provider arrays
+        token.googleAccounts = refreshed.filter((a: any) => a.provider === "google");
+        token.microsoftAccounts = refreshed.filter((a: any) => a.provider === "azure-ad");
+
+        console.log("JWT refresh - after filtering - microsoft accounts:", token.microsoftAccounts);
+
         // Maintain single-token fields for convenience (use the first account)
         const first = refreshed[0];
         if (first) {
@@ -150,6 +295,7 @@ export const authOptions: NextAuthOptions = {
         }
         return token;
       }
+
       // Legacy single-account refresh
       if (Date.now() < (token.accessTokenExpires as number) - 60000) {
         return token;
@@ -157,21 +303,23 @@ export const authOptions: NextAuthOptions = {
       return await refreshAccessToken(token);
     },
     async session({ session, token }) {
+      console.log("Session callback - token.dbUserId:", (token as any).dbUserId, "token.sub:", (token as any).sub);
+
       (session as any).accessToken = token.accessToken;
       (session as any).googleAccounts = token.googleAccounts || [];
+      (session as any).microsoftAccounts = token.microsoftAccounts || [];
       // Carry over any user object we stored on the token during sign-in
       const existingUser = (token as any).user || (session as any).user || {};
-      // Always ensure an id is present using the JWT subject
+      // Use the database user ID if available, otherwise fall back to JWT subject
       const ensuredUser = {
         ...existingUser,
-        id: (existingUser && existingUser.id) || (token as any).sub,
+        id: (token as any).dbUserId || (existingUser && existingUser.id) || (token as any).sub,
       };
       (session as any).user = ensuredUser;
+      console.log("Session user.id:", ensuredUser.id);
       return session;
     },
   },
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
 };
-
-

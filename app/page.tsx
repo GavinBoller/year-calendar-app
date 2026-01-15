@@ -259,6 +259,7 @@ export default function HomePage() {
       setEvents([]);
       return;
     }
+    console.log(`Fetching events for year=${year}, calendars=${selectedCalendarIds.join(',')}`);
     const controller = new AbortController();
     const qs = `/api/events?year=${year}${
       selectedCalendarIds.length
@@ -269,12 +270,29 @@ export default function HomePage() {
       .then((res) => res.json())
       .then((data) => {
         if (!controller.signal.aborted) {
-          setEvents(data.events || []);
+          console.log(`Received ${data.events?.length || 0} events`);
+          setEvents(prevEvents => {
+            const newEvents = data.events || [];
+            // Keep events from calendars that are still selected but not in newEvents (failed fetches)
+            const prevFromSelected = prevEvents.filter(e =>
+              selectedCalendarIds.some(id => e.calendarId.includes(id))
+            );
+            // Combine and deduplicate by id
+            const all = [...prevFromSelected, ...newEvents];
+            const unique = all.filter((e, i, arr) => arr.findIndex(x => x.id === e.id) === i);
+            return [...unique]; // Force new array reference for re-render
+          });
         }
       })
       .catch((err) => {
         if (!controller.signal.aborted) {
-          setEvents([]);
+          console.log('Error fetching events:', err);
+          // On error, keep existing events but filter to selected calendars
+          setEvents(prevEvents =>
+            prevEvents.filter(e =>
+              selectedCalendarIds.some(id => e.calendarId.includes(id))
+            )
+          );
         }
       });
     return () => controller.abort();
@@ -957,7 +975,7 @@ export default function HomePage() {
                 </div>
               )}
               {status === "authenticated" && (
-                <div className="px-2 py-3">
+                <div className="px-2 py-3 space-y-2">
                   <Button
                     variant="outline"
                     className="w-full justify-center gap-2 rounded-full"
@@ -984,6 +1002,33 @@ export default function HomePage() {
                   >
                     <Plus className="h-4 w-4" />
                     <span>Add Google account</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center gap-2 rounded-full"
+                    onClick={() => {
+                      // Persist existing accountIds so we can auto-add the new account's calendars after linking
+                      try {
+                        const existing = Array.from(
+                          new Set(accounts.map((a) => a.accountId))
+                        ).filter(Boolean);
+                        localStorage.setItem(
+                          "preLinkAccountIds",
+                          JSON.stringify(existing)
+                        );
+                      } catch {}
+                      import("next-auth/react").then(({ signIn }) => {
+                        const href = window.location.href;
+                        const hasQuery = href.includes("?");
+                        const callbackUrl = `${href}${
+                          hasQuery ? "&" : "?"
+                        }linkingAccount=1`;
+                        signIn("microsoft", { callbackUrl });
+                      });
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Add Microsoft account</span>
                   </Button>
                 </div>
               )}
@@ -1020,15 +1065,27 @@ export default function HomePage() {
                   </div>
                 </>
               ) : (
-                <Button
-                  className="w-full justify-center"
-                  onClick={() => {
-                    setSidebarOpen(false);
-                    signIn("google");
-                  }}
-                >
-                  Sign in with Google
-                </Button>
+                <div className="space-y-2">
+                  <Button
+                    className="w-full justify-center"
+                    onClick={() => {
+                      setSidebarOpen(false);
+                      signIn("google");
+                    }}
+                  >
+                    Sign in with Google
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center"
+                    onClick={() => {
+                      setSidebarOpen(false);
+                      signIn("microsoft");
+                    }}
+                  >
+                    Sign in with Microsoft
+                  </Button>
+                </div>
               )}
             </div>
           </aside>

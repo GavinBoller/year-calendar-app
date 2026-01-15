@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { mergeAccountsFromDbAndSession, refreshGoogleAccessToken, fetchWithAutoRefresh } from "@/lib/google-accounts";
+import { mergeMicrosoftAccountsFromDbAndSession, refreshMicrosoftAccessToken, fetchMicrosoftWithAutoRefresh } from "@/lib/microsoft-accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -38,26 +39,32 @@ export async function GET(req: Request) {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  console.log(`Events API called: year=${year}, calendarIdsParam=${calendarIdsParam}, calendarIds=${calendarIds}`);
+
   const session = await getServerSession(authOptions);
   if (!(session as any)?.user?.id) {
+    console.log('No user session');
     return NextResponse.json({ events: [] }, { status: 200 });
   }
 
-  let accounts = await mergeAccountsFromDbAndSession(
+  // Get accounts from both providers
+  const googleAccounts = await mergeAccountsFromDbAndSession(
     (session as any).user.id as string,
     session as any
   );
-  if (accounts.length === 0) {
+  const microsoftAccounts = await mergeMicrosoftAccountsFromDbAndSession(
+    (session as any).user.id as string,
+    session as any
+  );
+
+  const allAccounts = [...googleAccounts, ...microsoftAccounts];
+
+  console.log(`Accounts: google=${googleAccounts.length}, microsoft=${microsoftAccounts.length}, total=${allAccounts.length}`);
+
+  if (allAccounts.length === 0) {
+    console.log('No accounts found');
     return NextResponse.json({ events: [] }, { status: 200 });
   }
-
-  const params = new URLSearchParams({
-    singleEvents: "true",
-    orderBy: "startTime",
-    timeMin: startOfYearIso(year),
-    timeMax: endOfYearIso(year),
-    maxResults: "2500",
-  });
 
   // calendarIds are composite: `${accountId}|${calendarId}`
   const idsByAccount = new Map<string, string[]>();
@@ -70,47 +77,173 @@ export async function GET(req: Request) {
       idsByAccount.set(accId, arr);
     }
   }
+
+  console.log('idsByAccount:', Object.fromEntries(idsByAccount));
+
   const fetches: Promise<any>[] = [];
-  for (const acc of accounts) {
+
+  for (const acc of allAccounts) {
+    const isMicrosoft = microsoftAccounts.some(ma => ma.accountId === acc.accountId);
     let tokenToUse: string | undefined = acc.accessToken as string | undefined;
-    const cals =
-      idsByAccount.size > 0 ? idsByAccount.get(acc.accountId) || [] : ["primary"];
+
+    // Get calendars for this account
+    const cals = idsByAccount.size > 0 ? idsByAccount.get(acc.accountId) || [] : ["primary"];
+
     for (const calId of cals) {
-      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
-        calId
-      )}/events?${params.toString()}`;
-      fetches.push(
-        (async () => {
-          if (!tokenToUse) return { items: [], calendarId: calId, accountId: acc.accountId };
-          const doFetch = async (accessToken: string) => {
-            const res = await fetch(url, {
-              headers: { Authorization: `Bearer ${accessToken}` },
-              cache: "no-store",
+      if (isMicrosoft) {
+        // Microsoft Graph API for calendar events - use calendarView to automatically expand recurring events
+        // Fetch from year-1 to year+1
+        const startDate = `${year - 1}-01-01`;
+        const endDate = `${year + 1}-01-01`;
+        const url = `https://graph.microsoft.com/v1.0/me/calendars/${encodeURIComponent(calId)}/calendarView?startDateTime=${startDate}T00:00:00Z&endDateTime=${endDate}T00:00:00Z&$orderby=start/dateTime&$top=1000`;
+
+        fetches.push(
+          (async () => {
+            if (!tokenToUse) return { items: [], calendarId: calId, accountId: acc.accountId };
+            const doFetch = async (accessToken: string) => {
+              const res = await fetch(url, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+                cache: "no-store",
+              });
+              if (!res.ok) return { ok: false as const, status: res.status, data: null as any };
+              const data = await res.json();
+              return { ok: true as const, status: res.status, data };
+            };
+            let attempt = await doFetch(tokenToUse);
+            if (!attempt.ok && attempt.status === 401 && acc.refreshToken) {
+              try {
+                const refreshed = await refreshMicrosoftAccessToken(acc.refreshToken);
+                tokenToUse = refreshed.accessToken;
+                attempt = await doFetch(tokenToUse);
+              } catch {}
+            }
+            // Retry on 429 with exponential backoff
+            if (!attempt.ok && attempt.status === 429) {
+              for (let retry = 1; retry <= 3; retry++) {
+                const delay = Math.pow(2, retry) * 1000; // 2s, 4s, 8s
+                console.log(`Retrying ${calId} in ${delay}ms (attempt ${retry})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                attempt = await doFetch(tokenToUse);
+                if (attempt.ok) break;
+              }
+            }
+            if (!attempt.ok) {
+              console.log(`Microsoft fetch failed for ${calId}: status=${attempt.status}, data=${JSON.stringify(attempt.data)}`);
+              return { items: [], calendarId: calId, accountId: acc.accountId };
+            }
+
+            // Debug: Log raw Microsoft events
+            console.log(`Microsoft events for calendar ${calId}:`, attempt.data.value?.length || 0, 'events');
+            attempt.data.value?.slice(0, 5).forEach((e: any, i: number) => {
+              console.log(`Event ${i}:`, {
+                id: e.id,
+                subject: e.subject,
+                start: e.start,
+                end: e.end,
+                isCancelled: e.isCancelled,
+                seriesMasterId: e.seriesMasterId,
+                type: e.type
+              });
             });
-            if (!res.ok) return { ok: false as const, status: res.status, data: null as any };
-            const data = await res.json();
-            return { ok: true as const, status: res.status, data };
-          };
-          let attempt = await doFetch(tokenToUse);
-          if (!attempt.ok && attempt.status === 401 && acc.refreshToken) {
-            try {
-              const refreshed = await refreshGoogleAccessToken(acc.refreshToken);
-              tokenToUse = refreshed.accessToken;
-              attempt = await doFetch(tokenToUse);
-            } catch {}
-          }
-          if (!attempt.ok) return { items: [], calendarId: calId, accountId: acc.accountId };
-          return {
-            items: attempt.data.items || [],
-            calendarId: calId,
-            accountId: acc.accountId,
-          };
-        })()
-      );
+
+            // Transform Microsoft events to match Google format
+            // calendarView automatically expands recurring events
+            const items: any[] = (attempt.data.value || []).filter((e: any) => !e.isCancelled);
+
+            // Debug: Log all event subjects
+            console.log('All event subjects for calendar:', items.map(e => e.subject));
+
+            const transformedItems = items.map((e: any) => {
+              // Only include all-day events (skip timed events)
+              // All-day events have the same start and end times
+              const startTime = e.start?.dateTime?.split('T')[1];
+              const endTime = e.end?.dateTime?.split('T')[1];
+              if (startTime !== endTime) {
+                return null; // Skip timed events
+              }
+
+              let startDate: string;
+              let endDate: string;
+
+              // Extract dates from dateTime
+              startDate = e.start.dateTime.split('T')[0];
+              endDate = e.end.dateTime.split('T')[0];
+
+              const transformed = {
+                id: e.id,
+                summary: e.subject || "(Untitled)",
+                start: { date: startDate },
+                end: { date: endDate },
+                status: e.isCancelled ? "cancelled" : "confirmed",
+              };
+
+              return transformed;
+            }).filter(Boolean) // Remove null entries
+            .filter((e: any) => e.start.date.startsWith(`${year}-`)); // Only include events for the requested year
+
+            console.log(`Calendar ${calId}: ${items.length} raw events -> ${transformedItems.length} transformed events`);
+
+            return {
+              items: transformedItems,
+              calendarId: calId,
+              accountId: acc.accountId,
+            };
+          })()
+        );
+      } else {
+        // Google Calendar API
+        const params = new URLSearchParams({
+          singleEvents: "true",
+          orderBy: "startTime",
+          timeMin: startOfYearIso(year),
+          timeMax: endOfYearIso(year),
+          maxResults: "2500",
+        });
+
+        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+          calId
+        )}/events?${params.toString()}`;
+
+        fetches.push(
+          (async () => {
+            if (!tokenToUse) return { items: [], calendarId: calId, accountId: acc.accountId };
+            const doFetch = async (accessToken: string) => {
+              const res = await fetch(url, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+                cache: "no-store",
+              });
+              if (!res.ok) return { ok: false as const, status: res.status, data: null as any };
+              const data = await res.json();
+              return { ok: true as const, status: res.status, data };
+            };
+            let attempt = await doFetch(tokenToUse);
+            if (!attempt.ok && attempt.status === 401 && acc.refreshToken) {
+              try {
+                const refreshed = await refreshGoogleAccessToken(acc.refreshToken);
+                tokenToUse = refreshed.accessToken;
+                attempt = await doFetch(tokenToUse);
+              } catch {}
+            }
+            if (!attempt.ok) return { items: [], calendarId: calId, accountId: acc.accountId };
+            return {
+              items: attempt.data.items || [],
+              calendarId: calId,
+              accountId: acc.accountId,
+            };
+          })()
+        );
+      }
     }
   }
- 
-  const results = await Promise.all(fetches);
+
+  // Fetch sequentially with delay to avoid rate limiting
+  const results = [];
+  for (const fetchPromise of fetches) {
+    results.push(await fetchPromise);
+    // Delay to avoid rate limiting
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  console.log(`Fetch results: ${results.length} results`);
   const events = results.flatMap((r) =>
     (r.items || [])
       .filter((e: any) => e?.start?.date && e.status !== "cancelled")
@@ -122,6 +255,11 @@ export async function GET(req: Request) {
         endDate: e.end?.date as string,
       }))
   );
+
+  console.log(`Final events: ${events.length} events`);
+  if (events.length > 0) {
+    console.log('Sample events:', events.slice(0, 3));
+  }
 
   return NextResponse.json({ events });
 }
@@ -473,5 +611,3 @@ export async function PUT(req: Request) {
     });
   }
 }
-
-

@@ -191,6 +191,8 @@ export function YearCalendar({
   const [editEndDate, setEditEndDate] = React.useState<string>("");
   const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
   const [menuOpen, setMenuOpen] = React.useState<boolean>(false);
+  const [hoveredEvent, setHoveredEvent] = React.useState<string | null>(null);
+  const [tooltipPosition, setTooltipPosition] = React.useState<{ x: number; y: number } | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
   const editStartDateInputRef = React.useRef<HTMLInputElement | null>(null);
   const editEndDateInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -363,29 +365,36 @@ export function YearCalendar({
                   onDayClick?.(key);
                 }}
               >
+                {/* Month label - more prominent and always visible */}
                 {isFirstOfMonth && (
-                  <div className="absolute top-1 left-1 text-[10px] leading-none uppercase tracking-wide text-primary">
-                    {monthShort[date.getMonth()]}
-                    {showDaysOfWeek && (
-                      <span className="text-[10px] opacity-60">
-                        {dayOfWeekShort[date.getDay()]}
-                      </span>
-                    )}
+                  <div className="absolute top-0.5 left-0.5 right-0.5 bg-primary/10 rounded-sm px-1 py-0.5">
+                    <div className="text-[9px] leading-none font-semibold uppercase tracking-wider text-primary">
+                      {monthShort[date.getMonth()]}
+                    </div>
                   </div>
                 )}
+
+                {/* Month boundary line - vertical line on the left side of the 1st of each month */}
+                {isFirstOfMonth && (
+                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary/30" />
+                )}
+
+                {/* Day of week - subtle but consistent */}
+                {showDaysOfWeek && (
+                  <div className="absolute top-0.5 right-0.5 text-[10px] leading-none text-muted-foreground/70 font-medium">
+                    {dayOfWeekShort[date.getDay()].slice(0, 2)}
+                  </div>
+                )}
+
+                {/* Date number - clearer and better positioned */}
                 <div
                   className={cn(
-                    "mb-0.5 text-[10px] leading-none text-muted-foreground",
-                    isToday && "text-primary font-semibold",
-                    isFirstOfMonth && showDaysOfWeek && "ml-11",
-                    isFirstOfMonth && !showDaysOfWeek && "ml-6"
+                    "absolute bottom-0.5 left-1.5 text-[11px] leading-none font-medium",
+                    isToday && "text-primary font-bold",
+                    isWeekend && !isToday && "text-muted-foreground/80",
+                    !isToday && !isWeekend && "text-foreground/90"
                   )}
                 >
-                  {!isFirstOfMonth && showDaysOfWeek && (
-                    <span className="text-[10px] opacity-60 mr-0.5">
-                      {dayOfWeekShort[date.getDay()]}
-                    </span>
-                  )}
                   {date.getDate()}
                 </div>
                 {/* Event chips removed; events are rendered as spanning bars below */}
@@ -474,6 +483,35 @@ export function YearCalendar({
                       height: laneHeight - 2,
                     }}
                     className="px-1 pointer-events-auto cursor-pointer"
+                    onMouseEnter={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setHoveredEvent(seg.ev.summary);
+                      // Calculate tooltip position to stay within window bounds
+                      const tooltipWidth = 300; // Approximate max width
+                      const tooltipHeight = 40; // Approximate height
+                      const margin = 8;
+
+                      let x = rect.left + rect.width / 2;
+                      let y = rect.top - margin;
+
+                      // Adjust horizontal position if tooltip would go off-screen
+                      if (x - tooltipWidth / 2 < margin) {
+                        x = tooltipWidth / 2 + margin;
+                      } else if (x + tooltipWidth / 2 > window.innerWidth - margin) {
+                        x = window.innerWidth - tooltipWidth / 2 - margin;
+                      }
+
+                      // Adjust vertical position if tooltip would go above viewport
+                      if (y - tooltipHeight < margin) {
+                        y = rect.bottom + margin;
+                      }
+
+                      setTooltipPosition({ x, y });
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredEvent(null);
+                      setTooltipPosition(null);
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                       const rect = (
@@ -866,6 +904,22 @@ export function YearCalendar({
         </div>
       )}
 
+      {/* Custom tooltip for event hover */}
+      {hoveredEvent && tooltipPosition && (
+        <div
+          className="fixed z-50 pointer-events-none bg-black text-white text-xs px-2 py-1 rounded shadow-lg max-w-sm break-words"
+          style={{
+            top: tooltipPosition.y,
+            left: tooltipPosition.x,
+            transform: "translateX(-50%) translateY(-100%)",
+            whiteSpace: "normal",
+            wordWrap: "break-word",
+          }}
+        >
+          {hoveredEvent}
+        </div>
+      )}
+
       {!signedIn && (
         <div className="fixed inset-0 flex items-center justify-center bg-background/70">
           <div className="w-[400px] max-w-[80vw] rounded-md border bg-card p-5 md:p-12 text-center shadow-sm pointer-events-auto">
@@ -873,16 +927,29 @@ export function YearCalendar({
             <div className="text-sm text-muted-foreground mb-4">
               A calendar for all-day events.
             </div>
-            <Button
-              className="w-full"
-              onClick={() => {
-                const callbackUrl =
-                  typeof window !== "undefined" ? window.location.href : "/";
-                signIn("google", { callbackUrl });
-              }}
-            >
-              Sign in with Google
-            </Button>
+            <div className="space-y-2">
+              <Button
+                className="w-full"
+                onClick={() => {
+                  const callbackUrl =
+                    typeof window !== "undefined" ? window.location.href : "/";
+                  signIn("google", { callbackUrl });
+                }}
+              >
+                Sign in with Google
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  const callbackUrl =
+                    typeof window !== "undefined" ? window.location.href : "/";
+                  signIn("azure-ad", { callbackUrl });
+                }}
+              >
+                Sign in with Microsoft
+              </Button>
+            </div>
             <div className="mt-6 flex items-center justify-center gap-3 text-xs text-muted-foreground">
               <Link
                 href="/privacy"
