@@ -275,7 +275,7 @@ export default function HomePage() {
             const newEvents = data.events || [];
             // Keep events from calendars that are still selected but not in newEvents (failed fetches)
             const prevFromSelected = prevEvents.filter(e =>
-              selectedCalendarIds.some(id => e.calendarId.includes(id))
+              selectedCalendarIds.some(id => e.calendarId && e.calendarId.includes(id))
             );
             // Combine and deduplicate by id
             const all = [...prevFromSelected, ...newEvents];
@@ -290,7 +290,7 @@ export default function HomePage() {
           // On error, keep existing events but filter to selected calendars
           setEvents(prevEvents =>
             prevEvents.filter(e =>
-              selectedCalendarIds.some(id => e.calendarId.includes(id))
+              selectedCalendarIds.some(id => e.calendarId && e.calendarId.includes(id))
             )
           );
         }
