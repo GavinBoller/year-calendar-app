@@ -17,15 +17,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ calendars: [] }, { status: 200 });
   }
 
-  // Get accounts from both providers
-  const googleAccounts = await mergeAccountsFromDbAndSession(
-    (session as any).user.id as string,
-    session as any
-  );
-  const microsoftAccounts = await mergeMicrosoftAccountsFromDbAndSession(
-    (session as any).user.id as string,
-    session as any
-  );
+  // Get accounts from both providers - load fresh from database
+  const { getFreshGoogleAccountsForUser } = await import("@/lib/google-accounts");
+  const { getFreshMicrosoftAccountsForUser } = await import("@/lib/microsoft-accounts");
+
+  const googleAccounts = await getFreshGoogleAccountsForUser((session as any).user.id as string);
+  const microsoftAccounts = await getFreshMicrosoftAccountsForUser((session as any).user.id as string);
 
   const allAccounts = [...googleAccounts, ...microsoftAccounts];
 
