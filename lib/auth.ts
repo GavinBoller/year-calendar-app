@@ -214,7 +214,7 @@ export const authOptions: NextAuthOptions = {
               expires_at: expiresInSec ? Math.floor(Date.now() / 1000) + expiresInSec : null,
             },
             create: {
-              userId: token.dbUserId,
+              userId: token.dbUserId as string,
               provider: account.provider,
               providerAccountId: acctId,
               access_token: account.access_token as string,
