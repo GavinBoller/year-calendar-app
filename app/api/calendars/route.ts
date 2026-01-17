@@ -30,7 +30,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ calendars: [] }, { status: 200 });
   }
 
-  const fetches = allAccounts.map(async (acc: any) => {
+  // Process accounts sequentially to avoid Microsoft rate limits
+  const results: any[] = [];
+  for (const acc of allAccounts) {
     // Determine provider and API endpoint
     const isMicrosoft = microsoftAccounts.some(ma => ma.accountId === acc.accountId);
     const baseUrl = isMicrosoft
@@ -69,14 +71,15 @@ export async function GET(req: Request) {
     }
 
     if (!tokenToUse) {
-      return {
+      results.push({
         items: [] as any[],
         accountId: acc.accountId,
         email: acc.email,
         status: 0,
         error: "missing access token",
         _debug: debug ? { status: 0, error: "missing access token" } : undefined,
-      };
+      });
+      continue;
     }
 
     let attempt = await doFetch(tokenToUse);
@@ -96,14 +99,15 @@ export async function GET(req: Request) {
     if (!attempt.ok) {
       finalStatus = attempt.status;
       finalError = attempt.error;
-      return {
+      results.push({
         items: [] as any[],
         accountId: acc.accountId,
         email: acc.email,
         status: finalStatus,
         error: finalError,
         _debug: debug ? { status: finalStatus, error: finalError } : undefined,
-      };
+      });
+      continue;
     }
 
     // Transform Microsoft calendar data to match Google format
@@ -118,16 +122,14 @@ export async function GET(req: Request) {
       }));
     }
 
-    return {
+    results.push({
       items,
       accountId: acc.accountId,
       email: acc.email,
       status: attempt.status,
       _debug: debug ? { status: attempt.status } : undefined,
-    };
-  });
-
-  const results = await Promise.all(fetches);
+    });
+  }
   const calendars = results.flatMap((r) =>
     (r.items || []).map((c: any) => ({
       id: `${r.accountId}|${c.id as string}`,
