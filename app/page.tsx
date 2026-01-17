@@ -1,6 +1,6 @@
 "use client";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +36,29 @@ type LinkedAccount = {
 
 export default function HomePage() {
   const { data: session, status } = useSession();
+
+  // Handle OAuthAccountNotLinked error by clearing session and redirecting
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('error') === 'OAuthAccountNotLinked') {
+        console.log('Detected OAuthAccountNotLinked error, clearing session');
+        // Clear NextAuth cookies
+        document.cookie.split(';').forEach(c => {
+          const name = c.trim().split('=')[0];
+          if (name.startsWith('next-auth.')) {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+          }
+        });
+        // Clear localStorage
+        try {
+          localStorage.clear();
+        } catch {}
+        // Redirect to clean URL
+        window.location.href = '/';
+      }
+    }
+  }, []);
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [events, setEvents] = useState<AllDayEvent[]>([]);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
