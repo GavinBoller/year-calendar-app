@@ -145,7 +145,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile, email }) {
       // Allow all sign-ins for now to debug
-      console.log("SignIn callback:", { provider: account?.provider, email: user?.email });
+      console.log("SignIn callback:", { provider: account?.provider, email: user?.email, userId: user?.id });
       return true;
     },
     async jwt({ token, account, user }) {

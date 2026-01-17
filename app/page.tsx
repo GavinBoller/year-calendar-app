@@ -1041,18 +1041,24 @@ export default function HomePage() {
                     variant="outline"
                     onClick={async () => {
                       setSidebarOpen(false);
+                      console.log("Sign-out: Starting disconnect process for accounts:", accounts);
                       // Disconnect all accounts before signing out
                       try {
-                        const disconnectPromises = accounts.map(account =>
-                          fetch("/api/accounts/disconnect", {
+                        const disconnectPromises = accounts.map(async (account) => {
+                          console.log("Sign-out: Disconnecting account:", account.accountId);
+                          const response = await fetch("/api/accounts/disconnect", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ accountId: account.accountId }),
-                          })
-                        );
-                        await Promise.all(disconnectPromises);
+                          });
+                          const result = await response.json();
+                          console.log("Sign-out: Disconnect result for", account.accountId, ":", result);
+                          return result;
+                        });
+                        const results = await Promise.all(disconnectPromises);
+                        console.log("Sign-out: All disconnect results:", results);
                       } catch (error) {
-                        console.error("Failed to disconnect accounts:", error);
+                        console.error("Sign-out: Failed to disconnect accounts:", error);
                       }
                       // Clear all local data on sign out
                       setEvents([]);
@@ -1067,7 +1073,11 @@ export default function HomePage() {
                       // Clear localStorage
                       try {
                         localStorage.clear();
-                      } catch {}
+                        console.log("Sign-out: Cleared localStorage");
+                      } catch (error) {
+                        console.error("Sign-out: Failed to clear localStorage:", error);
+                      }
+                      console.log("Sign-out: Calling NextAuth signOut");
                       // Sign out
                       signOut();
                     }}
