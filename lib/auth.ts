@@ -149,7 +149,7 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async jwt({ token, account, user }) {
-      console.log("JWT callback - token.dbUserId:", (token as any).dbUserId, "user:", user, "account:", account?.provider);
+      console.log("JWT callback - START - token.dbUserId:", (token as any).dbUserId, "user:", user, "account:", account?.provider);
 
       // Ensure user exists in database
       if (user && !token.dbUserId) {
@@ -184,8 +184,11 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
+      console.log("JWT callback - Before account processing - token.dbUserId:", (token as any).dbUserId);
+
       // When a (re)sign-in occurs, add/update this account in the appropriate array.
       if (account) {
+        console.log("JWT callback - Processing account:", account.provider, account.providerAccountId);
         const expiresInSecRaw = (account as any)?.expires_in;
         const expiresInSec =
           typeof expiresInSecRaw === "number"
@@ -264,6 +267,7 @@ export const authOptions: NextAuthOptions = {
         token.accessTokenExpires =
           Date.now() + (expiresInSec ? expiresInSec * 1000 : 3600 * 1000);
         token.user = user;
+        console.log("JWT callback - END - returning token with dbUserId:", (token as any).dbUserId, "googleAccounts:", Array.isArray(token.googleAccounts) ? token.googleAccounts.length : 0, "microsoftAccounts:", Array.isArray(token.microsoftAccounts) ? token.microsoftAccounts.length : 0);
         return token;
       }
 
