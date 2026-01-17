@@ -199,6 +199,35 @@ export const authOptions: NextAuthOptions = {
           emailFromIdToken((account as any)?.id_token as string | undefined) ||
           (user?.email as string | undefined);
 
+        // Manually save account to database for reliability
+        try {
+          await prisma.account.upsert({
+            where: {
+              provider_providerAccountId: {
+                provider: account.provider,
+                providerAccountId: acctId,
+              },
+            },
+            update: {
+              access_token: account.access_token as string,
+              refresh_token: (account.refresh_token as string) || null,
+              expires_at: expiresInSec ? Math.floor(Date.now() / 1000) + expiresInSec : null,
+            },
+            create: {
+              userId: token.dbUserId,
+              provider: account.provider,
+              providerAccountId: acctId,
+              access_token: account.access_token as string,
+              refresh_token: (account.refresh_token as string) || null,
+              expires_at: expiresInSec ? Math.floor(Date.now() / 1000) + expiresInSec : null,
+              type: (account.type as string) || "oauth",
+            },
+          });
+          console.log(`Saved ${account.provider} account to database:`, acctId);
+        } catch (error) {
+          console.error(`Failed to save ${account.provider} account to database:`, error);
+        }
+
         if (account.provider === "google") {
           const existing = (token.googleAccounts as any[]) || [];
           const updated = existing.filter((a) => a.accountId !== acctId);
