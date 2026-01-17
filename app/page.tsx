@@ -1041,6 +1041,21 @@ export default function HomePage() {
                     variant="outline"
                     onClick={() => {
                       setSidebarOpen(false);
+                      // Clear all local data on sign out
+                      setEvents([]);
+                      setCalendars([]);
+                      setAccounts([]);
+                      setSelectedCalendarIds([]);
+                      setCalendarColors({});
+                      setHiddenEventIds([]);
+                      setShowDaysOfWeek(false);
+                      setShowHidden(false);
+                      preferencesLoaded.current = false;
+                      // Clear localStorage
+                      try {
+                        localStorage.clear();
+                      } catch {}
+                      // Sign out
                       signOut();
                     }}
                   >
