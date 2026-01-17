@@ -17,7 +17,6 @@ export async function POST(req: Request) {
     await prisma.account.deleteMany({
       where: {
         userId: (session as any).user.id as string,
-        provider: "google",
         providerAccountId: accountId,
       },
     });
@@ -26,5 +25,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
-
-

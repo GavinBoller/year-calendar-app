@@ -1039,8 +1039,21 @@ export default function HomePage() {
                   <Button
                     className="w-full justify-center gap-2 rounded-full"
                     variant="outline"
-                    onClick={() => {
+                    onClick={async () => {
                       setSidebarOpen(false);
+                      // Disconnect all accounts before signing out
+                      try {
+                        const disconnectPromises = accounts.map(account =>
+                          fetch("/api/accounts/disconnect", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ accountId: account.accountId }),
+                          })
+                        );
+                        await Promise.all(disconnectPromises);
+                      } catch (error) {
+                        console.error("Failed to disconnect accounts:", error);
+                      }
                       // Clear all local data on sign out
                       setEvents([]);
                       setCalendars([]);
