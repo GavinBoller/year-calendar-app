@@ -123,7 +123,7 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         params: {
           // Rely on provider default base URL; just supply params so NextAuth merges them correctly.
-          prompt: "consent",
+          prompt: "select_account",
           access_type: "offline",
           response_type: "code",
           scope:
@@ -327,4 +327,8 @@ export const authOptions: NextAuthOptions = {
   },
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
+  pages: {
+    signIn: "/",
+    error: "/",
+  },
 };
