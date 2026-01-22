@@ -163,11 +163,11 @@ export const authOptions: NextAuthOptions = {
         // Test database connection
         await prisma.user.count();
         console.log("Database connection OK");
+        return true;
       } catch (dbError) {
         console.error("Database connection failed:", dbError);
         return false; // Fail sign-in if database is unreachable
       }
-      return true;
     },
     async jwt({ token, account, user }) {
       console.log("JWT callback - START - token.dbUserId:", (token as any).dbUserId, "user:", JSON.stringify(user, null, 2), "account:", account?.provider);
