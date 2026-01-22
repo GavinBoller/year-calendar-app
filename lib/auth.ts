@@ -158,7 +158,15 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile, email }) {
       // Allow all sign-ins for now to debug
-      console.log("SignIn callback:", { provider: account?.provider, email: user?.email, userId: user?.id });
+      console.log("SignIn callback:", { provider: account?.provider, email: user?.email, userId: user?.id, userKeys: Object.keys(user || {}) });
+      try {
+        // Test database connection
+        await prisma.user.count();
+        console.log("Database connection OK");
+      } catch (dbError) {
+        console.error("Database connection failed:", dbError);
+        return false; // Fail sign-in if database is unreachable
+      }
       return true;
     },
     async jwt({ token, account, user }) {
