@@ -164,7 +164,12 @@ export function YearCalendar({
   }>;
   showDaysOfWeek?: boolean;
 }) {
-  const todayKey = formatDateKey(new Date());
+  const [todayKey, setTodayKey] = React.useState<string>("");
+
+  React.useEffect(() => {
+    // Calculate todayKey on client side to avoid SSR hydration mismatch
+    setTodayKey(formatDateKey(new Date()));
+  }, []);
   const dateMap = useMemo(() => expandEventsToDateMap(events), [events]);
   const days = useMemo(() => generateYearDays(year), [year]);
   const dayIndexByKey = useMemo(() => {
