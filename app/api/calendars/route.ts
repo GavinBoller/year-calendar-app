@@ -21,8 +21,13 @@ export async function GET(req: Request) {
   const { getFreshGoogleAccountsForUser } = await import("@/lib/google-accounts");
   const { getFreshMicrosoftAccountsForUser } = await import("@/lib/microsoft-accounts");
 
-  const googleAccounts = await getFreshGoogleAccountsForUser((session as any).user.id as string);
-  const microsoftAccounts = await getFreshMicrosoftAccountsForUser((session as any).user.id as string);
+  const userId = (session as any).user.id as string;
+  console.log("Calendars API - fetching accounts for userId:", userId);
+
+  const googleAccounts = await getFreshGoogleAccountsForUser(userId);
+  const microsoftAccounts = await getFreshMicrosoftAccountsForUser(userId);
+
+  console.log("Calendars API - google accounts:", googleAccounts.length, "microsoft accounts:", microsoftAccounts.length);
 
   const allAccounts = [...googleAccounts, ...microsoftAccounts];
 
