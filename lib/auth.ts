@@ -115,7 +115,7 @@ async function refreshSingleAccount(account: any) {
 }
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  // Remove PrismaAdapter since we're using JWT strategy and handling database manually
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
