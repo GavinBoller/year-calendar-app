@@ -149,7 +149,7 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async jwt({ token, account, user }) {
-      console.log("JWT callback - START - token.dbUserId:", (token as any).dbUserId, "user:", user, "account:", account?.provider);
+      console.log("JWT callback - START - token.dbUserId:", (token as any).dbUserId, "user:", JSON.stringify(user, null, 2), "account:", account?.provider);
 
       // Ensure user exists in database
       if (user && !token.dbUserId) {
@@ -212,32 +212,36 @@ export const authOptions: NextAuthOptions = {
           (user?.email as string | undefined);
 
         // Manually save account to database for reliability
-        try {
-          await prisma.account.upsert({
-            where: {
-              provider_providerAccountId: {
+        if (token.dbUserId) {
+          try {
+            await prisma.account.upsert({
+              where: {
+                provider_providerAccountId: {
+                  provider: account.provider,
+                  providerAccountId: acctId,
+                },
+              },
+              update: {
+                access_token: account.access_token as string,
+                refresh_token: (account.refresh_token as string) || null,
+                expires_at: expiresInSec ? Math.floor(Date.now() / 1000) + expiresInSec : null,
+              },
+              create: {
+                userId: token.dbUserId as string,
                 provider: account.provider,
                 providerAccountId: acctId,
+                access_token: account.access_token as string,
+                refresh_token: (account.refresh_token as string) || null,
+                expires_at: expiresInSec ? Math.floor(Date.now() / 1000) + expiresInSec : null,
+                type: (account.type as string) || "oauth",
               },
-            },
-            update: {
-              access_token: account.access_token as string,
-              refresh_token: (account.refresh_token as string) || null,
-              expires_at: expiresInSec ? Math.floor(Date.now() / 1000) + expiresInSec : null,
-            },
-            create: {
-              userId: token.dbUserId as string,
-              provider: account.provider,
-              providerAccountId: acctId,
-              access_token: account.access_token as string,
-              refresh_token: (account.refresh_token as string) || null,
-              expires_at: expiresInSec ? Math.floor(Date.now() / 1000) + expiresInSec : null,
-              type: (account.type as string) || "oauth",
-            },
-          });
-          console.log(`Saved ${account.provider} account to database:`, acctId);
-        } catch (error) {
-          console.error(`Failed to save ${account.provider} account to database:`, error);
+            });
+            console.log(`Saved ${account.provider} account to database:`, acctId);
+          } catch (error) {
+            console.error(`Failed to save ${account.provider} account to database:`, error);
+          }
+        } else {
+          console.error(`Cannot save ${account.provider} account - no dbUserId set for user:`, user);
         }
 
         if (account.provider === "google") {
