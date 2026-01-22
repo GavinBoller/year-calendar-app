@@ -140,6 +140,19 @@ export const authOptions: NextAuthOptions = {
           scope: "openid email profile https://graph.microsoft.com/Calendars.Read https://graph.microsoft.com/Calendars.ReadWrite offline_access",
         },
       } as any,
+      profile(profile) {
+        console.log("Microsoft profile callback:", JSON.stringify(profile, null, 2));
+        return {
+          id: profile.sub,
+          name: profile.name || profile.displayName,
+          email: profile.email || profile.mail || profile.userPrincipalName,
+          image: profile.picture,
+          // Store additional Microsoft-specific fields
+          mail: profile.mail,
+          userPrincipalName: profile.userPrincipalName,
+          displayName: profile.displayName,
+        };
+      },
     }),
   ],
   callbacks: {
