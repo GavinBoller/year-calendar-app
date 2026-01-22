@@ -154,12 +154,21 @@ export const authOptions: NextAuthOptions = {
       // Ensure user exists in database
       if (user && !token.dbUserId) {
         try {
-          // For Microsoft, email might be in profile or need to be extracted differently
-          const userEmail = user.email || (user as any).profile?.email || (user as any).profile?.mail;
-          const userName = user.name || (user as any).profile?.name || (user as any).profile?.displayName;
-          const userImage = user.image || (user as any).profile?.picture;
+          // Extract user data - Microsoft uses different field names than Google
+          let userEmail = user.email;
+          let userName = user.name;
+          let userImage = user.image;
 
-          console.log("Attempting to create user with email:", userEmail, "name:", userName);
+          // For Microsoft accounts, check profile fields if user fields are missing
+          if (account?.provider === "azure-ad") {
+            const profile = user as any;
+            userEmail = userEmail || profile.mail || profile.userPrincipalName || profile.email;
+            userName = userName || profile.displayName || profile.name;
+            userImage = userImage || profile.picture || profile.photo;
+            console.log("Microsoft user data - email:", userEmail, "name:", userName, "profile fields:", Object.keys(profile));
+          }
+
+          console.log("Attempting to create user with email:", userEmail, "name:", userName, "provider:", account?.provider);
 
           if (userEmail) {
             const dbUser = await prisma.user.upsert({
