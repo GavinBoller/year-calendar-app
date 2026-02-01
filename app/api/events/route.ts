@@ -303,55 +303,116 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid calendarId" }, { status: 400 });
   }
 
-  let accounts = await mergeAccountsFromDbAndSession(
+  // Get accounts from both providers
+  const googleAccounts = await mergeAccountsFromDbAndSession(
     (session as any).user.id as string,
     session as any
   );
-  let account = accounts.find((a) => a.accountId === accountId);
+  const microsoftAccounts = await mergeMicrosoftAccountsFromDbAndSession(
+    (session as any).user.id as string,
+    session as any
+  );
+
+  const allAccounts = [...googleAccounts, ...microsoftAccounts];
+  const account = allAccounts.find((a) => a.accountId === accountId);
   if (!account) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
 
-  // Google all-day events require end.date to be exclusive.
-  // UI sends endDate as inclusive; convert to exclusive.
-  const endExclusive = addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1);
+  const isMicrosoft = microsoftAccounts.some(ma => ma.accountId === accountId);
 
-  const createUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
-    calendarId
-  )}/events`;
-  const createRes = await fetch(createUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${account.accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      summary: title,
-      start: { date: startDate },
-      end: { date: endExclusive },
-    }),
-    cache: "no-store",
-  });
+  if (isMicrosoft) {
+    // Microsoft Graph API for creating events
+    // Microsoft all-day events use dateTime format but with same start/end times
+    const startDateTime = `${startDate}T00:00:00Z`;
+    const endDateTime = isIsoDateOnly(endDate)
+      ? `${addDaysIsoDateOnly(endDate, 1)}T00:00:00Z`  // Exclusive end date
+      : `${addDaysIsoDateOnly(startDate, 1)}T00:00:00Z`;
 
-  if (!createRes.ok) {
-    let errText = "Failed to create event";
-    try {
-      const errJson = await createRes.json();
-      errText = errJson?.error?.message || errJson?.error_description || errText;
-    } catch {}
-    return NextResponse.json({ error: errText }, { status: createRes.status });
+    const createUrl = `https://graph.microsoft.com/v1.0/me/calendars/${encodeURIComponent(calendarId)}/events`;
+    const createRes = await fetch(createUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${account.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        subject: title,
+        start: {
+          dateTime: startDateTime,
+          timeZone: "UTC"
+        },
+        end: {
+          dateTime: endDateTime,
+          timeZone: "UTC"
+        },
+        isAllDay: true,
+      }),
+      cache: "no-store",
+    });
+
+    if (!createRes.ok) {
+      let errText = "Failed to create event";
+      try {
+        const errJson = await createRes.json();
+        errText = errJson?.error?.message || errJson?.message || errText;
+      } catch {}
+      return NextResponse.json({ error: errText }, { status: createRes.status });
+    }
+
+    const created = await createRes.json();
+    return NextResponse.json({
+      event: {
+        id: `${accountId}|${calendarId}:${created.id as string}`,
+        calendarId: `${accountId}|${calendarId}`,
+        summary: (created.subject as string) || title,
+        startDate,
+        endDate: isIsoDateOnly(endDate) ? endDate : startDate,
+      },
+    });
+  } else {
+    // Google Calendar API
+    // Google all-day events require end.date to be exclusive.
+    // UI sends endDate as inclusive; convert to exclusive.
+    const endExclusive = addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1);
+
+    const createUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+      calendarId
+    )}/events`;
+    const createRes = await fetch(createUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${account.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        summary: title,
+        start: { date: startDate },
+        end: { date: endExclusive },
+      }),
+      cache: "no-store",
+    });
+
+    if (!createRes.ok) {
+      let errText = "Failed to create event";
+      try {
+        const errJson = await createRes.json();
+        errText = errJson?.error?.message || errJson?.error_description || errText;
+      } catch {}
+      return NextResponse.json({ error: errText }, { status: createRes.status });
+    }
+
+    const created = await createRes.json();
+    return NextResponse.json({
+      event: {
+        id: `${accountId}|${calendarId}:${created.id as string}`,
+        calendarId: `${accountId}|${calendarId}`,
+        summary: (created.summary as string) || title,
+        startDate,
+        endDate: endExclusive,
+      },
+    });
   }
-
-  const created = await createRes.json();
-  return NextResponse.json({
-    event: {
-      id: `${accountId}|${calendarId}:${created.id as string}`,
-      calendarId: `${accountId}|${calendarId}`,
-      summary: (created.summary as string) || title,
-      startDate,
-      endDate: endExclusive,
-    },
-  });
 }
 
 export async function DELETE(req: Request) {
@@ -373,32 +434,82 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const accounts = await mergeAccountsFromDbAndSession(
+  // Get accounts from both providers
+  const googleAccounts = await mergeAccountsFromDbAndSession(
     (session as any).user.id as string,
     session as any
   );
-  const account = accounts.find((a) => a.accountId === accountId);
+  const microsoftAccounts = await mergeMicrosoftAccountsFromDbAndSession(
+    (session as any).user.id as string,
+    session as any
+  );
+
+  const allAccounts = [...googleAccounts, ...microsoftAccounts];
+  const account = allAccounts.find((a) => a.accountId === accountId);
   if (!account) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
 
-  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
-    calendarId
-  )}/events/${encodeURIComponent(eventId)}`;
-  const { response: res } = await fetchWithAutoRefresh(
-    url,
-    { method: "DELETE" },
-    account
-  );
-  if (!res.ok && res.status !== 204) {
-    let errText = "Failed to delete event";
-    try {
-      const errJson = await res.json();
-      errText = errJson?.error?.message || errJson?.error_description || errText;
-    } catch {}
-    return NextResponse.json({ error: errText }, { status: res.status });
+  const isMicrosoft = microsoftAccounts.some(ma => ma.accountId === accountId);
+
+  if (isMicrosoft) {
+    // Microsoft Graph API for deleting events
+    const deleteUrl = `https://graph.microsoft.com/v1.0/me/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`;
+    const deleteRes = await fetch(deleteUrl, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${account.accessToken}` },
+      cache: "no-store",
+    });
+
+    if (deleteRes.status === 401 && account.refreshToken) {
+      try {
+        const refreshed = await refreshMicrosoftAccessToken(account.refreshToken);
+        const retryRes = await fetch(deleteUrl, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${refreshed.accessToken}` },
+          cache: "no-store",
+        });
+        if (!retryRes.ok && retryRes.status !== 204) {
+          let errText = "Failed to delete event";
+          try {
+            const errJson = await retryRes.json();
+            errText = errJson?.error?.message || errJson?.message || errText;
+          } catch {}
+          return NextResponse.json({ error: errText }, { status: retryRes.status });
+        }
+        return NextResponse.json({ ok: true });
+      } catch {}
+    }
+
+    if (!deleteRes.ok && deleteRes.status !== 204) {
+      let errText = "Failed to delete event";
+      try {
+        const errJson = await deleteRes.json();
+        errText = errJson?.error?.message || errJson?.message || errText;
+      } catch {}
+      return NextResponse.json({ error: errText }, { status: deleteRes.status });
+    }
+    return NextResponse.json({ ok: true });
+  } else {
+    // Google Calendar API
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+      calendarId
+    )}/events/${encodeURIComponent(eventId)}`;
+    const { response: res } = await fetchWithAutoRefresh(
+      url,
+      { method: "DELETE" },
+      account
+    );
+    if (!res.ok && res.status !== 204) {
+      let errText = "Failed to delete event";
+      try {
+        const errJson = await res.json();
+        errText = errJson?.error?.message || errJson?.error_description || errText;
+      } catch {}
+      return NextResponse.json({ error: errText }, { status: res.status });
+    }
+    return NextResponse.json({ ok: true });
   }
-  return NextResponse.json({ ok: true });
 }
 
 export async function PUT(req: Request) {
@@ -448,12 +559,19 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Invalid calendarId" }, { status: 400 });
   }
 
-  const accounts = await mergeAccountsFromDbAndSession(
+  // Get accounts from both providers
+  const googleAccounts = await mergeAccountsFromDbAndSession(
     (session as any).user.id as string,
     session as any
   );
-  const oldAccount = accounts.find((a) => a.accountId === oldAccountId);
-  const newAccount = accounts.find((a) => a.accountId === newAccountId);
+  const microsoftAccounts = await mergeMicrosoftAccountsFromDbAndSession(
+    (session as any).user.id as string,
+    session as any
+  );
+
+  const allAccounts = [...googleAccounts, ...microsoftAccounts];
+  const oldAccount = allAccounts.find((a) => a.accountId === oldAccountId);
+  const newAccount = allAccounts.find((a) => a.accountId === newAccountId);
   if (!oldAccount) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
@@ -461,153 +579,322 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "New account not found" }, { status: 404 });
   }
 
-  // Google all-day events require end.date to be exclusive.
-  // UI sends endDate as inclusive; convert to exclusive.
-  const endExclusive = addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1);
+  const oldIsMicrosoft = microsoftAccounts.some(ma => ma.accountId === oldAccountId);
+  const newIsMicrosoft = microsoftAccounts.some(ma => ma.accountId === newAccountId);
+
+  // For Microsoft, endDate is inclusive; for Google, it's exclusive
+  const endExclusive = oldIsMicrosoft
+    ? (isIsoDateOnly(endDate) ? endDate : startDate)
+    : addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1);
 
   // If moving to a different calendar, we need to delete from old and create in new
   const isMovingCalendar = oldAccountId !== newAccountId || oldCalendarId !== newCalendarId;
 
   if (isMovingCalendar) {
     // Delete from old calendar
-    const deleteUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
-      oldCalendarId
-    )}/events/${encodeURIComponent(eventId)}`;
-    let deleteRes = await fetch(deleteUrl, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${oldAccount.accessToken}` },
-      cache: "no-store",
-    });
-    if (deleteRes.status === 401 && oldAccount.refreshToken) {
-      try {
-        const refreshed = await refreshGoogleAccessToken(oldAccount.refreshToken);
-        deleteRes = await fetch(deleteUrl, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${refreshed.accessToken}` },
-          cache: "no-store",
-        });
-      } catch {}
-    }
-    if (!deleteRes.ok && deleteRes.status !== 204) {
-      let errText = "Failed to delete event from old calendar";
-      try {
-        const errJson = await deleteRes.json();
-        errText = errJson?.error?.message || errJson?.error_description || errText;
-      } catch {}
-      return NextResponse.json({ error: errText }, { status: deleteRes.status });
+    if (oldIsMicrosoft) {
+      const deleteUrl = `https://graph.microsoft.com/v1.0/me/calendars/${encodeURIComponent(oldCalendarId)}/events/${encodeURIComponent(eventId)}`;
+      let deleteRes = await fetch(deleteUrl, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${oldAccount.accessToken}` },
+        cache: "no-store",
+      });
+      if (deleteRes.status === 401 && oldAccount.refreshToken) {
+        try {
+          const refreshed = await refreshMicrosoftAccessToken(oldAccount.refreshToken);
+          deleteRes = await fetch(deleteUrl, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${refreshed.accessToken}` },
+            cache: "no-store",
+          });
+        } catch {}
+      }
+      if (!deleteRes.ok && deleteRes.status !== 204) {
+        let errText = "Failed to delete event from old calendar";
+        try {
+          const errJson = await deleteRes.json();
+          errText = errJson?.error?.message || errJson?.message || errText;
+        } catch {}
+        return NextResponse.json({ error: errText }, { status: deleteRes.status });
+      }
+    } else {
+      const deleteUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+        oldCalendarId
+      )}/events/${encodeURIComponent(eventId)}`;
+      let deleteRes = await fetch(deleteUrl, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${oldAccount.accessToken}` },
+        cache: "no-store",
+      });
+      if (deleteRes.status === 401 && oldAccount.refreshToken) {
+        try {
+          const refreshed = await refreshGoogleAccessToken(oldAccount.refreshToken);
+          deleteRes = await fetch(deleteUrl, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${refreshed.accessToken}` },
+            cache: "no-store",
+          });
+        } catch {}
+      }
+      if (!deleteRes.ok && deleteRes.status !== 204) {
+        let errText = "Failed to delete event from old calendar";
+        try {
+          const errJson = await deleteRes.json();
+          errText = errJson?.error?.message || errJson?.error_description || errText;
+        } catch {}
+        return NextResponse.json({ error: errText }, { status: deleteRes.status });
+      }
     }
 
     // Create in new calendar
-    const createUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
-      newCalendarId
-    )}/events`;
-    const createRes = await fetch(createUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${newAccount.accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        summary: title,
-        start: { date: startDate },
-        end: { date: endExclusive },
-      }),
-      cache: "no-store",
-    });
+    if (newIsMicrosoft) {
+      const startDateTime = `${startDate}T00:00:00Z`;
+      const endDateTime = `${addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1)}T00:00:00Z`;
 
-    if (!createRes.ok) {
-      let errText = "Failed to create event in new calendar";
-      try {
-        const errJson = await createRes.json();
-        errText = errJson?.error?.message || errJson?.error_description || errText;
-      } catch {}
-      return NextResponse.json({ error: errText }, { status: createRes.status });
+      const createUrl = `https://graph.microsoft.com/v1.0/me/calendars/${encodeURIComponent(newCalendarId)}/events`;
+      const createRes = await fetch(createUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${newAccount.accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          subject: title,
+          start: {
+            dateTime: startDateTime,
+            timeZone: "UTC"
+          },
+          end: {
+            dateTime: endDateTime,
+            timeZone: "UTC"
+          },
+          isAllDay: true,
+        }),
+        cache: "no-store",
+      });
+
+      if (!createRes.ok) {
+        let errText = "Failed to create event in new calendar";
+        try {
+          const errJson = await createRes.json();
+          errText = errJson?.error?.message || errJson?.message || errText;
+        } catch {}
+        return NextResponse.json({ error: errText }, { status: createRes.status });
+      }
+
+      const created = await createRes.json();
+      return NextResponse.json({
+        event: {
+          id: `${newAccountId}|${newCalendarId}:${created.id as string}`,
+          calendarId: `${newAccountId}|${newCalendarId}`,
+          summary: (created.subject as string) || title,
+          startDate,
+          endDate: isIsoDateOnly(endDate) ? endDate : startDate,
+        },
+      });
+    } else {
+      const createUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+        newCalendarId
+      )}/events`;
+      const createRes = await fetch(createUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${newAccount.accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          summary: title,
+          start: { date: startDate },
+          end: { date: addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1) },
+        }),
+        cache: "no-store",
+      });
+
+      if (!createRes.ok) {
+        let errText = "Failed to create event in new calendar";
+        try {
+          const errJson = await createRes.json();
+          errText = errJson?.error?.message || errJson?.error_description || errText;
+        } catch {}
+        return NextResponse.json({ error: errText }, { status: createRes.status });
+      }
+
+      const created = await createRes.json();
+      return NextResponse.json({
+        event: {
+          id: `${newAccountId}|${newCalendarId}:${created.id as string}`,
+          calendarId: `${newAccountId}|${newCalendarId}`,
+          summary: (created.summary as string) || title,
+          startDate,
+          endDate: addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1),
+        },
+      });
     }
-
-    const created = await createRes.json();
-    return NextResponse.json({
-      event: {
-        id: `${newAccountId}|${newCalendarId}:${created.id as string}`,
-        calendarId: `${newAccountId}|${newCalendarId}`,
-        summary: (created.summary as string) || title,
-        startDate,
-        endDate: endExclusive,
-      },
-    });
   } else {
     // Update in place
-    const updateUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
-      oldCalendarId
-    )}/events/${encodeURIComponent(eventId)}`;
-    const updateRes = await fetch(updateUrl, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${oldAccount.accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        summary: title,
-        start: { date: startDate },
-        end: { date: endExclusive },
-      }),
-      cache: "no-store",
-    });
+    if (oldIsMicrosoft) {
+      const startDateTime = `${startDate}T00:00:00Z`;
+      const endDateTime = `${addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1)}T00:00:00Z`;
 
-    if (updateRes.status === 401 && oldAccount.refreshToken) {
-      try {
-        const refreshed = await refreshGoogleAccessToken(oldAccount.refreshToken);
-        const retryRes = await fetch(updateUrl, {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${refreshed.accessToken}`,
-            "Content-Type": "application/json",
+      const updateUrl = `https://graph.microsoft.com/v1.0/me/calendars/${encodeURIComponent(oldCalendarId)}/events/${encodeURIComponent(eventId)}`;
+      const updateRes = await fetch(updateUrl, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${oldAccount.accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          subject: title,
+          start: {
+            dateTime: startDateTime,
+            timeZone: "UTC"
           },
-          body: JSON.stringify({
-            summary: title,
-            start: { date: startDate },
-            end: { date: endExclusive },
-          }),
-          cache: "no-store",
-        });
-        if (!retryRes.ok) {
-          let errText = "Failed to update event";
-          try {
-            const errJson = await retryRes.json();
-            errText = errJson?.error?.message || errJson?.error_description || errText;
-          } catch {}
-          return NextResponse.json({ error: errText }, { status: retryRes.status });
-        }
-        const updated = await retryRes.json();
-        return NextResponse.json({
-          event: {
-            id: compositeId,
-            calendarId: `${oldAccountId}|${oldCalendarId}`,
-            summary: (updated.summary as string) || title,
-            startDate,
-            endDate: endExclusive,
+          end: {
+            dateTime: endDateTime,
+            timeZone: "UTC"
           },
-        });
-      } catch {}
-    }
+          isAllDay: true,
+        }),
+        cache: "no-store",
+      });
 
-    if (!updateRes.ok) {
-      let errText = "Failed to update event";
-      try {
-        const errJson = await updateRes.json();
-        errText = errJson?.error?.message || errJson?.error_description || errText;
-      } catch {}
-      return NextResponse.json({ error: errText }, { status: updateRes.status });
-    }
+      if (updateRes.status === 401 && oldAccount.refreshToken) {
+        try {
+          const refreshed = await refreshMicrosoftAccessToken(oldAccount.refreshToken);
+          const retryRes = await fetch(updateUrl, {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${refreshed.accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              subject: title,
+              start: {
+                dateTime: startDateTime,
+                timeZone: "UTC"
+              },
+              end: {
+                dateTime: endDateTime,
+                timeZone: "UTC"
+              },
+              isAllDay: true,
+            }),
+            cache: "no-store",
+          });
+          if (!retryRes.ok) {
+            let errText = "Failed to update event";
+            try {
+              const errJson = await retryRes.json();
+              errText = errJson?.error?.message || errJson?.message || errText;
+            } catch {}
+            return NextResponse.json({ error: errText }, { status: retryRes.status });
+          }
+          const updated = await retryRes.json();
+          return NextResponse.json({
+            event: {
+              id: compositeId,
+              calendarId: `${oldAccountId}|${oldCalendarId}`,
+              summary: (updated.subject as string) || title,
+              startDate,
+              endDate: isIsoDateOnly(endDate) ? endDate : startDate,
+            },
+          });
+        } catch {}
+      }
 
-    const updated = await updateRes.json();
-    return NextResponse.json({
-      event: {
-        id: compositeId,
-        calendarId: `${oldAccountId}|${oldCalendarId}`,
-        summary: (updated.summary as string) || title,
-        startDate,
-        endDate: endExclusive,
-      },
-    });
+      if (!updateRes.ok) {
+        let errText = "Failed to update event";
+        try {
+          const errJson = await updateRes.json();
+          errText = errJson?.error?.message || errJson?.message || errText;
+        } catch {}
+        return NextResponse.json({ error: errText }, { status: updateRes.status });
+      }
+
+      const updated = await updateRes.json();
+      return NextResponse.json({
+        event: {
+          id: compositeId,
+          calendarId: `${oldAccountId}|${oldCalendarId}`,
+          summary: (updated.subject as string) || title,
+          startDate,
+          endDate: isIsoDateOnly(endDate) ? endDate : startDate,
+        },
+      });
+    } else {
+      const updateUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+        oldCalendarId
+      )}/events/${encodeURIComponent(eventId)}`;
+      const updateRes = await fetch(updateUrl, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${oldAccount.accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          summary: title,
+          start: { date: startDate },
+          end: { date: addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1) },
+        }),
+        cache: "no-store",
+      });
+
+      if (updateRes.status === 401 && oldAccount.refreshToken) {
+        try {
+          const refreshed = await refreshGoogleAccessToken(oldAccount.refreshToken);
+          const retryRes = await fetch(updateUrl, {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${refreshed.accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              summary: title,
+              start: { date: startDate },
+              end: { date: addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1) },
+            }),
+            cache: "no-store",
+          });
+          if (!retryRes.ok) {
+            let errText = "Failed to update event";
+            try {
+              const errJson = await retryRes.json();
+              errText = errJson?.error?.message || errJson?.error_description || errText;
+            } catch {}
+            return NextResponse.json({ error: errText }, { status: retryRes.status });
+          }
+          const updated = await retryRes.json();
+          return NextResponse.json({
+            event: {
+              id: compositeId,
+              calendarId: `${oldAccountId}|${oldCalendarId}`,
+              summary: (updated.summary as string) || title,
+              startDate,
+              endDate: addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1),
+            },
+          });
+        } catch {}
+      }
+
+      if (!updateRes.ok) {
+        let errText = "Failed to update event";
+        try {
+          const errJson = await updateRes.json();
+          errText = errJson?.error?.message || errJson?.error_description || errText;
+        } catch {}
+        return NextResponse.json({ error: errText }, { status: updateRes.status });
+      }
+
+      const updated = await updateRes.json();
+      return NextResponse.json({
+        event: {
+          id: compositeId,
+          calendarId: `${oldAccountId}|${oldCalendarId}`,
+          summary: (updated.summary as string) || title,
+          startDate,
+          endDate: addDaysIsoDateOnly(isIsoDateOnly(endDate) ? endDate : startDate, 1),
+        },
+      });
+    }
   }
 }
