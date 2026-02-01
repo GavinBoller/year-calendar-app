@@ -851,11 +851,13 @@ export function YearCalendar({
                               ? window.confirm("Delete this event?")
                               : true;
                           if (!ok) return;
+                          // Clear popover immediately after confirmation
+                          setPopover({ event: null, x: 0, y: 0 });
+                          setMenuOpen(false);
                           try {
                             await onDeleteEvent(id);
-                          } finally {
-                            setPopover({ event: null, x: 0, y: 0 });
-                            setMenuOpen(false);
+                          } catch {
+                            // Error handling is done in the parent component
                           }
                         }}
                       >
