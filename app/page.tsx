@@ -393,10 +393,13 @@ export default function HomePage() {
           }
         }
 
-        // Update calendar colors (merge with existing, add defaults for new calendars)
-        const next = mergeCalendarColorsWithDefaults(list, calendarColors);
-        if (JSON.stringify(next) !== JSON.stringify(calendarColors)) {
-          setCalendarColors(next);
+        // Only update calendar colors if preferences haven't been loaded yet
+        // (to avoid overriding saved user preferences with defaults)
+        if (!preferencesLoaded.current) {
+          const next = mergeCalendarColorsWithDefaults(list, calendarColors);
+          if (JSON.stringify(next) !== JSON.stringify(calendarColors)) {
+            setCalendarColors(next);
+          }
         }
       })
       .catch(() => {
