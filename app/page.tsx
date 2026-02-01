@@ -73,7 +73,7 @@ export default function HomePage() {
   );
   const [hiddenEventIds, setHiddenEventIds] = useState<string[]>([]);
   const [showHidden, setShowHidden] = useState<boolean>(false);
-  const [showDaysOfWeek, setShowDaysOfWeek] = useState<boolean>(false);
+  const [showDaysOfWeek, setShowDaysOfWeek] = useState<boolean>(true);
   const [createOpen, setCreateOpen] = useState<boolean>(false);
   const [createTitle, setCreateTitle] = useState<string>("");
   const [createStartDate, setCreateStartDate] = useState<string>("");
