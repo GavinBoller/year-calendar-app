@@ -479,6 +479,11 @@ export function YearCalendar({
                 const bg = seg.ev.calendarId
                   ? calendarColors[seg.ev.calendarId]
                   : undefined;
+                // Calculate dynamic height based on text length
+                // Use taller height only for very long event titles that would definitely wrap
+                const textLength = seg.ev.summary.length;
+                const barHeight = textLength > 20 ? laneHeight : 16; // 16px for normal, 32px for long text
+
                 bars.push(
                   <div
                     key={key}
@@ -487,7 +492,7 @@ export function YearCalendar({
                       left,
                       top,
                       width,
-                      height: laneHeight,
+                      height: barHeight,
                     }}
                     className="px-1 pointer-events-auto cursor-pointer"
                     onMouseEnter={(e) => {
@@ -536,7 +541,7 @@ export function YearCalendar({
                       style={{
                         backgroundColor: bg || "#3174ad",
                         color: "#ffffff",
-                        height: laneHeight,
+                        height: barHeight,
                         lineHeight: '12px',
                       }}
                     >
