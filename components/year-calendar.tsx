@@ -448,7 +448,7 @@ export function YearCalendar({
             }
             const bars: Array<React.ReactElement> = [];
             const labelOffset = 16;
-            const laneHeight = 24;
+            const laneHeight = 32;
             const maxLanes = Math.max(
               1,
               Math.floor((cellSizePx.h - labelOffset - 2) / laneHeight)
