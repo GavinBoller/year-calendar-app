@@ -417,8 +417,11 @@ export default function HomePage() {
       // Still checking authentication
       setIsLoading(true);
     } else if (status === "authenticated") {
-      // Authenticated - show loading until we have data
+      // Authenticated - show loading until we have both calendars and events loaded
+      // We need calendars to know what to fetch, and events to display
       if (calendars.length > 0 && events.length >= 0) {
+        // We have calendars, and events have been attempted (even if empty)
+        // Since events loading is triggered by calendars loading, this should work
         setIsLoading(false);
       } else {
         setIsLoading(true);
