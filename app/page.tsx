@@ -94,7 +94,7 @@ export default function HomePage() {
     const next: Record<string, string> = { ...existingColors };
     for (const c of calendars) {
       if (!next[c.id]) {
-        next[c.id] = c.backgroundColor || "#cbd5e1";
+        next[c.id] = c.backgroundColor || "#3174ad";
       }
     }
     return next;
@@ -969,7 +969,7 @@ export default function HomePage() {
                           <span className="truncate flex-1">{c.summary}</span>
                           <input
                             type="color"
-                            value={calendarColors[c.id] || "#cbd5e1"}
+                            value={calendarColors[c.id] || "#3174ad"}
                             onChange={(e) => {
                               const next = {
                                 ...calendarColors,
@@ -980,7 +980,7 @@ export default function HomePage() {
                             className="h-4 w-4 rounded-full border-0 p-0 cursor-pointer appearance-none bg-transparent [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full"
                             style={{
                               backgroundColor:
-                                calendarColors[c.id] || "#cbd5e1",
+                                calendarColors[c.id] || "#3174ad",
                             }}
                             aria-label={`Color for ${c.summary}`}
                             title={`Color for ${c.summary}`}
