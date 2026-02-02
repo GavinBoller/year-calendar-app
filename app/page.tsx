@@ -63,6 +63,7 @@ export default function HomePage() {
   const [events, setEvents] = useState<AllDayEvent[]>([]);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [eventsLoaded, setEventsLoaded] = useState<boolean>(false);
   const [calendars, setCalendars] = useState<CalendarListItem[]>([]);
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>([]);
@@ -307,6 +308,7 @@ export default function HomePage() {
             const unique = all.filter((e, i, arr) => arr.findIndex(x => x.id === e.id) === i);
             return [...unique]; // Force new array reference for re-render
           });
+          setEventsLoaded(true);
         }
       })
       .catch((err) => {
@@ -417,11 +419,8 @@ export default function HomePage() {
       // Still checking authentication
       setIsLoading(true);
     } else if (status === "authenticated") {
-      // Authenticated - show loading until we have both calendars and events loaded
-      // We need calendars to know what to fetch, and events to display
-      if (calendars.length > 0 && events.length >= 0) {
-        // We have calendars, and events have been attempted (even if empty)
-        // Since events loading is triggered by calendars loading, this should work
+      // Authenticated - show loading until events have been loaded at least once
+      if (eventsLoaded) {
         setIsLoading(false);
       } else {
         setIsLoading(true);
@@ -430,7 +429,7 @@ export default function HomePage() {
       // Not authenticated
       setIsLoading(false);
     }
-  }, [status, calendars.length, events.length]);
+  }, [status, eventsLoaded]);
 
   useEffect(() => {
     if (!createOpen) {
