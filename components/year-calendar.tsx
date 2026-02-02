@@ -362,7 +362,7 @@ export function YearCalendar({
                   "relative bg-background p-1 min-w-0 min-h-0 overflow-hidden",
                   isWeekend &&
                     'bg-white before:content-[""] before:absolute before:inset-0 before:bg-[rgba(0,0,0,0.02)] before:pointer-events-none',
-                  isPastDate && "bg-muted/30",
+                  isPastDate && "border-l-2 border-l-muted-foreground/30",
                   isToday && "ring-1 ring-primary"
                 )}
                 title={date.toDateString()}
