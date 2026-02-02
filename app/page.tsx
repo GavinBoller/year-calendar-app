@@ -413,7 +413,18 @@ export default function HomePage() {
 
   // Track when initial loading is complete
   useEffect(() => {
-    if (status === "authenticated" && calendars.length > 0 && events.length >= 0) {
+    if (status === "loading") {
+      // Still checking authentication
+      setIsLoading(true);
+    } else if (status === "authenticated") {
+      // Authenticated - show loading until we have data
+      if (calendars.length > 0 && events.length >= 0) {
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+      }
+    } else {
+      // Not authenticated
       setIsLoading(false);
     }
   }, [status, calendars.length, events.length]);
