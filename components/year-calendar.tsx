@@ -487,7 +487,7 @@ export function YearCalendar({
                       left,
                       top,
                       width,
-                      height: laneHeight - 2,
+                      height: laneHeight,
                     }}
                     className="px-1 pointer-events-auto cursor-pointer"
                     onMouseEnter={(e) => {
@@ -532,12 +532,12 @@ export function YearCalendar({
                     }}
                   >
                     <div
-                      className="whitespace-normal break-words rounded-sm px-1 text-[10px] leading-[12px] shadow-sm"
+                      className="whitespace-normal break-words rounded-sm px-1 text-[10px] leading-[12px] shadow-sm overflow-visible"
                       style={{
                         backgroundColor: bg || "#3174ad",
                         color: "#ffffff",
-                        height: laneHeight - 2,
-                        lineHeight: `${laneHeight - 4}px`,
+                        height: laneHeight,
+                        lineHeight: '12px',
                       }}
                     >
                       {seg.ev.summary}
