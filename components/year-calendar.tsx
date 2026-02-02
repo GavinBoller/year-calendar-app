@@ -362,7 +362,7 @@ export function YearCalendar({
                   "relative bg-background p-1 min-w-0 min-h-0 overflow-hidden",
                   isWeekend &&
                     'bg-white before:content-[""] before:absolute before:inset-0 before:bg-[rgba(0,0,0,0.02)] before:pointer-events-none',
-                  isPastDate && "border-l-2 border-l-muted-foreground/30",
+                  isPastDate && "bg-slate-100/20 dark:bg-slate-800/20",
                   isToday && "ring-1 ring-primary"
                 )}
                 title={date.toDateString()}
@@ -534,7 +534,7 @@ export function YearCalendar({
                     <div
                       className="truncate rounded-sm px-1 text-[10px] leading-[14px] shadow-sm"
                       style={{
-                        backgroundColor: bg || "hsl(var(--secondary))",
+                        backgroundColor: bg || "#3174ad",
                         color: "#ffffff",
                         height: laneHeight - 2,
                         lineHeight: `${laneHeight - 4}px`,
