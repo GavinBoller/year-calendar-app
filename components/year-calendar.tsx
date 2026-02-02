@@ -532,7 +532,7 @@ export function YearCalendar({
                     }}
                   >
                     <div
-                      className="truncate rounded-sm px-1 text-[10px] leading-[14px] shadow-sm"
+                      className="whitespace-normal break-words rounded-sm px-1 text-[10px] leading-[12px] shadow-sm"
                       style={{
                         backgroundColor: bg || "#3174ad",
                         color: "#ffffff",
