@@ -62,6 +62,7 @@ export default function HomePage() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [events, setEvents] = useState<AllDayEvent[]>([]);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [calendars, setCalendars] = useState<CalendarListItem[]>([]);
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>([]);
@@ -269,6 +270,7 @@ export default function HomePage() {
         });
     } else if (status !== "authenticated") {
       preferencesLoaded.current = false;
+      setIsLoading(false);
     }
   }, [status]);
 
@@ -408,6 +410,13 @@ export default function HomePage() {
         setCalendarColors({});
       });
   }, [status]);
+
+  // Track when initial loading is complete
+  useEffect(() => {
+    if (status === "authenticated" && calendars.length > 0 && events.length >= 0) {
+      setIsLoading(false);
+    }
+  }, [status, calendars.length, events.length]);
 
   useEffect(() => {
     if (!createOpen) {
@@ -608,8 +617,11 @@ export default function HomePage() {
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <div className="font-semibold text-lg min-w-[5ch] text-center leading-none">
+          <div className="font-semibold text-lg min-w-[5ch] text-center leading-none flex items-center gap-2">
             {year}
+            {(isLoading || isRefreshing) && (
+              <RefreshCcw className="h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
           <Button
             variant="ghost"
