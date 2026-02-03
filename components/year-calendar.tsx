@@ -479,6 +479,11 @@ export function YearCalendar({
                 const bg = seg.ev.calendarId
                   ? calendarColors[seg.ev.calendarId]
                   : undefined;
+                // Calculate dynamic max height based on available space in cell
+                // Leave room for date at bottom (15px) and ensure text doesn't overflow cell
+                const availableHeight = cellSizePx.h - (labelOffset + lane * laneHeight) - 15;
+                const maxHeight = Math.max(12, Math.min(availableHeight, laneHeight)); // At least 12px, at most laneHeight
+
                 bars.push(
                   <div
                     key={key}
@@ -536,7 +541,7 @@ export function YearCalendar({
                         backgroundColor: bg || "#3174ad",
                         color: "#ffffff",
                         lineHeight: '12px',
-                        maxHeight: '28px', // Prevent overflow beyond cell boundaries
+                        maxHeight: `${maxHeight}px`, // Dynamic height based on available space
                       }}
                     >
                       {seg.ev.summary}
