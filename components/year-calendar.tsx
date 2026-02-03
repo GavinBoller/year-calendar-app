@@ -479,10 +479,11 @@ export function YearCalendar({
                 const bg = seg.ev.calendarId
                   ? calendarColors[seg.ev.calendarId]
                   : undefined;
-                // Calculate dynamic height based on text length
-                // Use taller height only for very long event titles that would definitely wrap
-                const textLength = seg.ev.summary.length;
-                const barHeight = textLength > 20 ? laneHeight : 16; // 16px for normal, 32px for long text
+                // Calculate if text will wrap based on available width and text length
+                // Rough estimate: ~8-10px per character at 10px font size
+                const charsPerLine = Math.floor(width / 8); // Conservative estimate
+                const willWrap = seg.ev.summary.length > charsPerLine;
+                const barHeight = willWrap ? laneHeight : 16; // 16px for single line, 32px for wrapped
 
                 bars.push(
                   <div
