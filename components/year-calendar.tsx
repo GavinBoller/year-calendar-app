@@ -479,15 +479,6 @@ export function YearCalendar({
                 const bg = seg.ev.calendarId
                   ? calendarColors[seg.ev.calendarId]
                   : undefined;
-                // Calculate height based on text length with very generous allowances for wrapping
-                const textLength = seg.ev.summary.length;
-                let barHeight = 16; // Default single line height
-
-                if (textLength > 10) barHeight = 32; // Can fit 2-3 lines comfortably
-                if (textLength > 18) barHeight = 48; // Can fit 4 lines comfortably
-                if (textLength > 26) barHeight = 64; // Can fit 5-6 lines comfortably
-                if (textLength > 34) barHeight = 80; // Can fit 6-7 lines comfortably
-
                 bars.push(
                   <div
                     key={key}
@@ -496,7 +487,6 @@ export function YearCalendar({
                       left,
                       top,
                       width,
-                      height: barHeight,
                     }}
                     className="px-1 pointer-events-auto cursor-pointer"
                     onMouseEnter={(e) => {
@@ -541,11 +531,10 @@ export function YearCalendar({
                     }}
                   >
                     <div
-                      className="whitespace-normal break-words rounded-sm px-1 text-[10px] leading-[12px] shadow-sm overflow-visible"
+                      className="whitespace-normal break-words rounded-sm px-1 text-[10px] leading-[12px] shadow-sm"
                       style={{
                         backgroundColor: bg || "#3174ad",
                         color: "#ffffff",
-                        height: barHeight,
                         lineHeight: '12px',
                       }}
                     >
