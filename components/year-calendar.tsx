@@ -480,8 +480,8 @@ export function YearCalendar({
                   ? calendarColors[seg.ev.calendarId]
                   : undefined;
                 // Calculate if text will wrap based on available width and text length
-                // Rough estimate: ~8-10px per character at 10px font size
-                const charsPerLine = Math.floor(width / 8); // Conservative estimate
+                // Rough estimate: ~6-8px per character at 10px font size with padding
+                const charsPerLine = Math.floor((width - 8) / 6); // Account for padding and be conservative
                 const willWrap = seg.ev.summary.length > charsPerLine;
                 const barHeight = willWrap ? laneHeight : 16; // 16px for single line, 32px for wrapped
 
