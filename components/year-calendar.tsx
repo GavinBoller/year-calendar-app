@@ -450,7 +450,7 @@ export function YearCalendar({
             const labelOffset = 16;
             const laneHeight = 32;
             const maxLanes = Math.max(
-              1,
+              2, // Ensure at least 2 events can be shown per day
               Math.floor((cellSizePx.h - labelOffset - 2) / laneHeight)
             );
             for (const [row, segs] of rowToSegs) {
