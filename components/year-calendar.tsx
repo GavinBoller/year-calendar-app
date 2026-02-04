@@ -479,11 +479,13 @@ export function YearCalendar({
                 const bg = seg.ev.calendarId
                   ? calendarColors[seg.ev.calendarId]
                   : undefined;
-                // Calculate maximum height: minimum of cell boundary and reasonable text limit (3 lines max)
+                // Calculate dynamic maximum height based on available cell space
                 const cellBoundaryLimit = cellSizePx.h - (labelOffset + lane * laneHeight) - 15;
-                const maxTextLines = 3; // Maximum 3 lines of text
                 const textLineHeight = 12; // 12px line height
-                const maxTextHeight = maxTextLines * textLineHeight;
+                const maxPossibleLines = Math.floor(cellBoundaryLimit / textLineHeight);
+                // Cap at reasonable maximum to prevent excessive wrapping (4-5 lines max)
+                const maxReasonableLines = Math.min(maxPossibleLines, 5);
+                const maxTextHeight = maxReasonableLines * textLineHeight;
                 const maxHeight = Math.min(cellBoundaryLimit, maxTextHeight);
 
                 bars.push(
