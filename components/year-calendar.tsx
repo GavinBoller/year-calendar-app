@@ -454,7 +454,14 @@ export function YearCalendar({
               Math.floor((cellSizePx.h - labelOffset - 2) / laneHeight)
             );
             for (const [row, segs] of rowToSegs) {
-              segs.sort((a, b) => a.startCol - b.startCol);
+              segs.sort((a, b) => {
+                // Sort by start column first
+                if (a.startCol !== b.startCol) {
+                  return a.startCol - b.startCol;
+                }
+                // Then by event ID for stable sorting
+                return a.ev.id.localeCompare(b.ev.id);
+              });
               const laneEnds: number[] = [];
               for (const seg of segs) {
                 let lane = 0;
