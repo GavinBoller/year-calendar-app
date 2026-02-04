@@ -462,26 +462,32 @@ export function YearCalendar({
                 // Then by event ID for stable sorting
                 return a.ev.id.localeCompare(b.ev.id);
               });
-              // Assign lanes sequentially to ensure consistent display
-              let lane = 0;
+              const laneEnds: number[] = [];
               for (const seg of segs) {
+                let lane = 0;
+                while (
+                  lane < laneEnds.length &&
+                  seg.startCol < laneEnds[lane]
+                ) {
+                  lane++;
+                }
                 if (lane >= maxLanes) continue;
-                const assignedLane = lane;
-                lane++;
+                if (lane === laneEnds.length) laneEnds.push(seg.endCol);
+                else laneEnds[lane] = seg.endCol;
                 const left = pad + seg.startCol * (cellSizePx.w + gap);
                 const top =
                   pad +
                   row * (cellSizePx.h + gap) +
                   labelOffset +
-                  assignedLane * laneHeight;
+                  lane * laneHeight;
                 const span = seg.endCol - seg.startCol;
                 const width = span * cellSizePx.w + (span - 1) * gap;
-                const key = `${seg.ev.id}:${row}:${seg.startCol}-${seg.endCol}:${assignedLane}`;
+                const key = `${seg.ev.id}:${row}:${seg.startCol}-${seg.endCol}:${lane}`;
                 const bg = seg.ev.calendarId
                   ? calendarColors[seg.ev.calendarId]
                   : undefined;
                 // Calculate dynamic maximum height based on available cell space
-                const cellBoundaryLimit = cellSizePx.h - (labelOffset + assignedLane * laneHeight) - 15;
+                const cellBoundaryLimit = cellSizePx.h - (labelOffset + lane * laneHeight) - 15;
                 const textLineHeight = 12; // 12px line height
                 const maxPossibleLines = Math.floor(cellBoundaryLimit / textLineHeight);
                 // Cap at reasonable maximum to prevent excessive wrapping (4-5 lines max)
