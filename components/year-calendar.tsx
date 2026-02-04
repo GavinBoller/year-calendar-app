@@ -479,6 +479,13 @@ export function YearCalendar({
                 const bg = seg.ev.calendarId
                   ? calendarColors[seg.ev.calendarId]
                   : undefined;
+                // Calculate maximum height: minimum of cell boundary and reasonable text limit (3 lines max)
+                const cellBoundaryLimit = cellSizePx.h - (labelOffset + lane * laneHeight) - 15;
+                const maxTextLines = 3; // Maximum 3 lines of text
+                const textLineHeight = 12; // 12px line height
+                const maxTextHeight = maxTextLines * textLineHeight;
+                const maxHeight = Math.min(cellBoundaryLimit, maxTextHeight);
+
                 bars.push(
                   <div
                     key={key}
@@ -487,8 +494,8 @@ export function YearCalendar({
                       left,
                       top,
                       width,
-                      // Constrain height to prevent overflow beyond cell boundaries
-                      maxHeight: `${cellSizePx.h - (labelOffset + lane * laneHeight) - 15}px`,
+                      // Constrain height to prevent overflow and limit text lines
+                      maxHeight: `${maxHeight}px`,
                     }}
                     className="px-1 pointer-events-auto cursor-pointer"
                     onMouseEnter={(e) => {
