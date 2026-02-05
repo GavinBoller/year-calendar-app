@@ -483,6 +483,10 @@ export function YearCalendar({
                 if (lane === laneEnds.length) laneEnds.push(seg.endCol);
                 else laneEnds[lane] = seg.endCol;
                 const left = pad + seg.startCol * (cellSizePx.w + gap);
+
+                // Check if there are multiple events on this day
+                const multipleEventsOnDay = (eventsPerDay.get(seg.startCol) || 0) >= 2;
+
                 // Use compact spacing for multiple events on the same day
                 const currentLaneHeight = multipleEventsOnDay ? compactLaneHeight : laneHeight;
                 const top =
@@ -496,9 +500,6 @@ export function YearCalendar({
                 const bg = seg.ev.calendarId
                   ? calendarColors[seg.ev.calendarId]
                   : undefined;
-
-                // Check if there are multiple events on this day
-                const multipleEventsOnDay = (eventsPerDay.get(seg.startCol) || 0) >= 2;
 
                 // Calculate dynamic maximum height based on available cell space
                 const cellBoundaryLimit = cellSizePx.h - (labelOffset + lane * currentLaneHeight) - 15;
