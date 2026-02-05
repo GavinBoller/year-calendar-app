@@ -140,7 +140,7 @@ export function ViewControls({
                 Select Dates
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
+            <PopoverContent className="w-auto p-0 bg-background border shadow-lg" align="start">
               <CalendarComponent
                 mode="range"
                 selected={dateRange || undefined}
