@@ -12,7 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { YearCalendar, AllDayEvent } from "@/components/year-calendar";
+import { CalendarWrapper } from "@/components/calendar-wrapper";
+import { AllDayEvent } from "@/components/year-calendar";
 import {
   ChevronLeft,
   ChevronRight,
@@ -608,7 +609,7 @@ export default function HomePage() {
 
   return (
     <div className="h-screen w-screen flex flex-col">
-      <div className="grid grid-cols-3 items-center p-3">
+      <div className="flex items-center justify-between p-3 border-b">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -620,33 +621,7 @@ export default function HomePage() {
             ☰
           </Button>
         </div>
-        <div className="flex items-center justify-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hover:bg-transparent"
-            onClick={onPrev}
-            aria-label="Previous year"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <div className="font-semibold text-lg min-w-[5ch] text-center leading-none flex items-center gap-2">
-            {year}
-            {(isLoading || isRefreshing) && (
-              <RefreshCcw className="h-4 w-4 animate-spin text-muted-foreground" />
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hover:bg-transparent"
-            onClick={onNext}
-            aria-label="Next year"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </Button>
-        </div>
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             className="gap-2 rounded-full justify-center"
@@ -1181,9 +1156,8 @@ export default function HomePage() {
         </>
       )}
       <div className="flex-1 min-h-0">
-        <YearCalendar
+        <CalendarWrapper
           year={year}
-          events={visibleEvents}
           signedIn={status === "authenticated"}
           calendarColors={calendarColors}
           calendarNames={calendarNames}
@@ -1191,13 +1165,13 @@ export default function HomePage() {
           writableCalendars={writableCalendars}
           writableAccountsWithCalendars={writableAccountsWithCalendars}
           showDaysOfWeek={showDaysOfWeek}
-          onDayClick={(dateKey) => {
+          onDayClick={(dateKey: string) => {
             if (status === "authenticated") {
               createDateFromDayClick.current = dateKey;
               setCreateOpen(true);
             }
           }}
-          onUpdateEvent={async (event) => {
+          onUpdateEvent={async (event: { id: string; title: string; calendarId: string; startDate: string; endDate?: string }) => {
             try {
               await fetch("/api/events", {
                 method: "PUT",
@@ -1213,7 +1187,7 @@ export default function HomePage() {
             } catch {}
             await onRefresh();
           }}
-          onDeleteEvent={async (id) => {
+          onDeleteEvent={async (id: string) => {
             try {
               await fetch("/api/events", {
                 method: "DELETE",
@@ -1223,7 +1197,7 @@ export default function HomePage() {
             } catch {}
             await onRefresh();
           }}
-          onHideEvent={(id) => {
+          onHideEvent={(id: string) => {
             setHiddenEventIds((prev) =>
               prev.includes(id) ? prev : [...prev, id]
             );
