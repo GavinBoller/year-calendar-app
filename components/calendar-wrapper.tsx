@@ -222,7 +222,7 @@ function CalendarContent(props: CalendarWrapperProps) {
     <div className="h-screen flex flex-col bg-background">
       <ViewControls
         currentView={currentView}
-        currentYear={currentYear}
+        currentPeriod={currentPeriod}
         dateRange={dateRange}
         isDarkMode={theme === "dark"}
         isLoading={isLoading}

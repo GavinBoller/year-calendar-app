@@ -17,7 +17,7 @@ interface DateRange {
 
 interface ViewControlsProps {
   currentView: CalendarView;
-  currentYear: number;
+  currentPeriod: Date;
   dateRange: DateRange | null;
   isDarkMode: boolean;
   isLoading?: boolean;
@@ -30,7 +30,7 @@ interface ViewControlsProps {
 
 export function ViewControls({
   currentView,
-  currentYear,
+  currentPeriod,
   dateRange,
   isDarkMode,
   isLoading,
@@ -93,14 +93,14 @@ export function ViewControls({
             {currentView === "custom" && dateRange
               ? `${format(dateRange.from, "MMM d")} - ${format(dateRange.to, "MMM d, yyyy")}`
               : currentView === "year"
-              ? currentYear
+              ? currentPeriod.getFullYear()
               : currentView === "month"
-              ? format(new Date(currentYear, new Date().getMonth()), "MMMM yyyy")
+              ? format(currentPeriod, "MMMM yyyy")
               : currentView === "week"
-              ? `Week of ${format(startOfWeek(new Date()), "MMM d, yyyy")}`
+              ? `Week of ${format(startOfWeek(currentPeriod), "MMM d, yyyy")}`
               : currentView === "day"
-              ? format(new Date(), "MMM d, yyyy")
-              : currentYear
+              ? format(currentPeriod, "MMM d, yyyy")
+              : currentPeriod.getFullYear()
             }
           </span>
           {isLoading && (
@@ -195,11 +195,6 @@ export function ViewControls({
           ) : (
             <Moon className="h-4 w-4" />
           )}
-        </Button>
-
-        {/* Settings menu */}
-        <Button variant="ghost" size="sm" className="w-9 h-9 p-0">
-          <Settings className="h-4 w-4" />
         </Button>
       </div>
     </div>
