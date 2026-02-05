@@ -198,7 +198,7 @@ export function YearCalendar({
   const [menuOpen, setMenuOpen] = React.useState<boolean>(false);
   const [hoveredEvent, setHoveredEvent] = React.useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = React.useState<{ x: number; y: number } | null>(null);
-  const [hoveredDayEvents, setHoveredDayEvents] = React.useState<AllDayEvent[] | null>(null);
+  const [hoveredDayEvents, setHoveredDayEvents] = React.useState<{ events: AllDayEvent[], date: Date } | null>(null);
   const [popupPosition, setPopupPosition] = React.useState<{ x: number; y: number; showAbove: boolean } | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
   const editStartDateInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -635,7 +635,8 @@ export function YearCalendar({
                         // Get all events for this day
                         const dayKey = days[dayIndex]?.key;
                         const allDayEvents = dayKey ? dateMap.get(dayKey) || [] : [];
-                        setHoveredDayEvents(allDayEvents);
+                        const dayDate = days[dayIndex]?.date;
+                        setHoveredDayEvents({ events: allDayEvents, date: dayDate });
                         // Position the popup
                         const popupWidth = 300;
                         const popupHeight = Math.min(200, allDayEvents.length * 30 + 40);
@@ -1105,9 +1106,15 @@ export function YearCalendar({
           }}
         >
           <div className="p-3">
-            <div className="text-sm font-medium mb-2">All Events</div>
+            <div className="text-sm font-medium mb-2">
+              {hoveredDayEvents.date.toLocaleDateString('en-US', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short'
+              })} - All Events
+            </div>
             <div className="space-y-2 max-h-48 overflow-y-auto">
-              {hoveredDayEvents.map((event, index) => (
+              {hoveredDayEvents.events.map((event: AllDayEvent, index: number) => (
                 <div key={event.id} className="flex items-start gap-2 text-xs">
                   <div
                     className="w-2 h-2 rounded-full mt-0.5 flex-shrink-0"
