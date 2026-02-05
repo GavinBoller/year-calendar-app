@@ -34,6 +34,7 @@ interface CalendarWrapperProps {
     startDate: string;
     endDate?: string;
   }) => Promise<void> | void;
+  onYearChange?: (year: number) => void;
   writableCalendars?: CalendarListItem[];
   writableAccountsWithCalendars?: Array<{
     accountId: string;
@@ -176,7 +177,9 @@ function CalendarContent(props: CalendarWrapperProps) {
 
   const handlePreviousPeriod = () => {
     if (currentView === "year") {
-      setCurrentYear(prev => prev - 1);
+      const newYear = currentYear - 1;
+      setCurrentYear(newYear);
+      props.onYearChange?.(newYear);
     } else if (currentView === "month") {
       setCurrentPeriod(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
     } else if (currentView === "week") {
@@ -188,7 +191,9 @@ function CalendarContent(props: CalendarWrapperProps) {
 
   const handleNextPeriod = () => {
     if (currentView === "year") {
-      setCurrentYear(prev => prev + 1);
+      const newYear = currentYear + 1;
+      setCurrentYear(newYear);
+      props.onYearChange?.(newYear);
     } else if (currentView === "month") {
       setCurrentPeriod(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
     } else if (currentView === "week") {

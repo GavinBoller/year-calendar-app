@@ -1167,6 +1167,7 @@ export default function HomePage() {
           writableCalendars={writableCalendars}
           writableAccountsWithCalendars={writableAccountsWithCalendars}
           showDaysOfWeek={showDaysOfWeek}
+          onYearChange={setYear}
           onDayClick={(dateKey: string) => {
             if (status === "authenticated") {
               createDateFromDayClick.current = dateKey;
