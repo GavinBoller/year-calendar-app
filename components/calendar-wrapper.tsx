@@ -20,6 +20,7 @@ interface CalendarWrapperProps {
   year: number;
   events?: AllDayEvent[];
   signedIn: boolean;
+  isLoading?: boolean;
   calendarColors?: Record<string, string>;
   calendarNames?: Record<string, string>;
   calendarAccounts?: Record<string, string>;
@@ -43,13 +44,16 @@ interface CalendarWrapperProps {
 }
 
 function CalendarContent(props: CalendarWrapperProps) {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isViewLoading, setIsViewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<CalendarView>("year");
   const [currentYear, setCurrentYear] = useState(props.year);
   const [currentPeriod, setCurrentPeriod] = useState(new Date());
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const { theme, setTheme } = useTheme();
+
+  // Use parent's loading state if provided, otherwise use internal view loading
+  const isLoading = props.isLoading || isViewLoading;
 
   // Generate days based on current view and date range
   const generateViewDays = (view: CalendarView, period: Date, range: DateRange | null) => {
@@ -129,7 +133,7 @@ function CalendarContent(props: CalendarWrapperProps) {
     // Simple loading simulation for view changes
     const loadView = async () => {
       try {
-        setIsLoading(true);
+        setIsViewLoading(true);
         setError(null);
 
         // Small delay to show loading state on view changes
@@ -137,7 +141,7 @@ function CalendarContent(props: CalendarWrapperProps) {
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load view');
       } finally {
-        setIsLoading(false);
+        setIsViewLoading(false);
       }
     };
 

@@ -1160,6 +1160,7 @@ export default function HomePage() {
           year={year}
           events={visibleEvents}
           signedIn={status === "authenticated"}
+          isLoading={isLoading}
           calendarColors={calendarColors}
           calendarNames={calendarNames}
           calendarAccounts={calendarAccounts}
