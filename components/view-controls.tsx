@@ -15,6 +15,11 @@ interface DateRange {
   to: Date;
 }
 
+interface RangeSelection {
+  from?: Date;
+  to?: Date;
+}
+
 interface ViewControlsProps {
   currentView: CalendarView;
   currentPeriod: Date;
@@ -41,6 +46,7 @@ export function ViewControls({
   onToggleDarkMode,
 }: ViewControlsProps) {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [currentRangeSelection, setCurrentRangeSelection] = useState<{ from?: Date; to?: Date } | undefined>(undefined);
 
   const handleQuickRange = (range: "week" | "month" | "year") => {
     const today = new Date();
@@ -67,10 +73,12 @@ export function ViewControls({
   };
 
   const handleCustomRange = (range: { from?: Date; to?: Date } | undefined) => {
+    setCurrentRangeSelection(range);
     if (range?.from && range?.to) {
       onDateRangeChange({ from: range.from, to: range.to });
       onViewChange("custom");
       setIsDatePickerOpen(false);
+      setCurrentRangeSelection(undefined);
     }
   };
 
@@ -134,7 +142,12 @@ export function ViewControls({
         </Select>
 
         {currentView === "custom" && (
-          <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+          <Popover open={isDatePickerOpen} onOpenChange={(open) => {
+            setIsDatePickerOpen(open);
+            if (!open) {
+              setCurrentRangeSelection(undefined);
+            }
+          }}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 Select Dates
@@ -143,7 +156,7 @@ export function ViewControls({
             <PopoverContent className="w-auto p-0 bg-background border shadow-lg" align="start">
               <CalendarComponent
                 mode="range"
-                selected={dateRange || undefined}
+                selected={currentRangeSelection as any}
                 onSelect={handleCustomRange}
                 numberOfMonths={2}
                 disabled={(date) => date < new Date("1900-01-01")}
