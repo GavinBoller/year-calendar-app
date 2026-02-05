@@ -177,8 +177,28 @@ export function YearCalendar({
     // Calculate todayKey on client side to avoid SSR hydration mismatch
     setTodayKey(formatDateKey(new Date()));
   }, []);
-  const dateMap = useMemo(() => expandEventsToDateMap(events), [events]);
   const days = useMemo(() => customDays || generateYearDays(year), [customDays, year]);
+  // For year view, show all events regardless of year. For other views, show events for the displayed period.
+  const displayEvents = useMemo(() => {
+    if (!customDays) {
+      // Year view - show all events
+      return events;
+    } else {
+      // Month/Week/Day view - show events for the displayed period
+      const periodStart = days[0]?.date;
+      const periodEnd = days[days.length - 1]?.date;
+      if (periodStart && periodEnd) {
+        const endExclusive = new Date(periodEnd);
+        endExclusive.setDate(endExclusive.getDate() + 1);
+        return events.filter(event => {
+          const eventStart = new Date(event.startDate + "T00:00:00Z");
+          return eventStart >= periodStart && eventStart < endExclusive;
+        });
+      }
+      return events;
+    }
+  }, [events, customDays, days]);
+  const dateMap = useMemo(() => expandEventsToDateMap(displayEvents), [displayEvents]);
   const dayIndexByKey = useMemo(() => {
     const map = new Map<string, number>();
     days.forEach((d, i) => map.set(d.key, i));
