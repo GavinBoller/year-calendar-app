@@ -236,10 +236,10 @@ function CalendarContent(props: CalendarWrapperProps) {
           <MobileGestures handlers={mobileGestureHandlers} className="h-full">
             <YearCalendar
               {...props}
-              year={currentYear}
+              year={currentView === "year" ? currentYear : currentPeriod.getFullYear()}
               currentYear={currentView === "year" ? currentYear : currentPeriod.getFullYear()}
               events={props.events || []}
-              showDaysOfWeek={currentView === "custom" && viewDays.length <= 31}
+              showDaysOfWeek={props.showDaysOfWeek}
               customDays={viewDays}
             />
           </MobileGestures>

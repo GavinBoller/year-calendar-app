@@ -389,7 +389,7 @@ export function YearCalendar({
     return `${left} – ${right}`;
   }
 
-  // Special handling for day view - single large cell
+  // Special handling for day view - compact single day display
   if (days.length === 1) {
     const { key, date } = days[0];
     const isToday = key === todayKey;
@@ -398,71 +398,58 @@ export function YearCalendar({
     const isPastDate = todayKey && key < todayKey;
 
     return (
-      <div className="h-full w-full overflow-hidden">
-        <div className="relative h-full w-full flex items-center justify-center p-4">
-          <div
-            className={cn(
-              "w-full max-w-2xl h-full max-h-[600px] bg-background border rounded-lg p-6 overflow-hidden",
-              isWeekend &&
-                'bg-white before:content-[""] before:absolute before:inset-0 before:bg-[rgba(0,0,0,0.02)] before:pointer-events-none before:rounded-lg',
-              isPastDate && "bg-slate-100/20 dark:bg-slate-800/20",
-              isToday && "ring-2 ring-primary"
-            )}
-            onClick={(e) => {
-              onDayClick?.(key);
-            }}
-          >
-            {/* Day header */}
-            <div className="text-center mb-6">
-              <div className="text-2xl font-bold text-foreground">
-                {date.toLocaleDateString('en-US', { weekday: 'long' })}
-              </div>
-              <div className="text-lg text-muted-foreground">
-                {date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </div>
+      <div className="h-full w-full overflow-hidden p-4">
+        <div className="max-w-md mx-auto">
+          {/* Day header */}
+          <div className="text-center mb-4">
+            <div className="text-xl font-bold text-foreground">
+              {date.toLocaleDateString('en-US', { weekday: 'long' })}
             </div>
+            <div className="text-sm text-muted-foreground">
+              {date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </div>
+          </div>
 
-            {/* Events list */}
-            <div className="space-y-3 overflow-y-auto max-h-full">
-              {dayEvents.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
-                  No events on this day
-                </div>
-              ) : (
-                dayEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="p-4 rounded-lg border bg-card cursor-pointer hover:bg-accent/50 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Open event popover
-                      setPopover({
-                        event,
-                        x: window.innerWidth / 2,
-                        y: window.innerHeight / 2,
-                      });
-                    }}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className="w-4 h-4 rounded-full mt-1 flex-shrink-0"
-                        style={{
-                          backgroundColor: calendarColors[event.calendarId || ""] || "#3174ad",
-                        }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-foreground break-words">
-                          {event.summary}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {calendarNames[event.calendarId || ""] || "Calendar"}
-                        </div>
+          {/* Events list - compact and no scrolling */}
+          <div className="space-y-2">
+            {dayEvents.length === 0 ? (
+              <div className="text-center text-muted-foreground py-4 text-sm">
+                No events on this day
+              </div>
+            ) : (
+              dayEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="p-3 rounded-md border bg-card cursor-pointer hover:bg-accent/50 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Open event popover
+                    setPopover({
+                      event,
+                      x: window.innerWidth / 2,
+                      y: window.innerHeight / 2,
+                    });
+                  }}
+                >
+                  <div className="flex items-start gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full mt-0.5 flex-shrink-0"
+                      style={{
+                        backgroundColor: calendarColors[event.calendarId || ""] || "#3174ad",
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-foreground text-sm break-words">
+                        {event.summary}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {calendarNames[event.calendarId || ""] || "Calendar"}
                       </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -531,9 +518,9 @@ export function YearCalendar({
             </div>
           </div>
         )}
-
-        return;
-      }
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-full overflow-hidden">
