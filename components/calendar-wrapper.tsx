@@ -237,6 +237,7 @@ function CalendarContent(props: CalendarWrapperProps) {
             <YearCalendar
               {...props}
               year={currentYear}
+              currentYear={currentView === "year" ? currentYear : currentPeriod.getFullYear()}
               events={props.events || []}
               showDaysOfWeek={currentView === "custom" && viewDays.length <= 31}
               customDays={viewDays}

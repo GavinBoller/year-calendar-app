@@ -143,6 +143,7 @@ export function YearCalendar({
   writableAccountsWithCalendars = [],
   showDaysOfWeek = false,
   customDays,
+  currentYear,
 }: {
   year: number;
   events: AllDayEvent[];
@@ -168,6 +169,7 @@ export function YearCalendar({
   }>;
   showDaysOfWeek?: boolean;
   customDays?: Array<{ key: string; date: Date }>;
+  currentYear?: number;
 }) {
   const [todayKey, setTodayKey] = React.useState<string>("");
 
