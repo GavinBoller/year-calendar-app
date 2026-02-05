@@ -1158,6 +1158,7 @@ export default function HomePage() {
       <div className="flex-1 min-h-0">
         <CalendarWrapper
           year={year}
+          events={visibleEvents}
           signedIn={status === "authenticated"}
           calendarColors={calendarColors}
           calendarNames={calendarNames}

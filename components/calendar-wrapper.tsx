@@ -18,6 +18,7 @@ interface DateRange {
 
 interface CalendarWrapperProps {
   year: number;
+  events?: AllDayEvent[];
   signedIn: boolean;
   calendarColors?: Record<string, string>;
   calendarNames?: Record<string, string>;
@@ -42,7 +43,6 @@ interface CalendarWrapperProps {
 }
 
 function CalendarContent(props: CalendarWrapperProps) {
-  const [events, setEvents] = useState<AllDayEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<CalendarView>("year");
@@ -52,10 +52,48 @@ function CalendarContent(props: CalendarWrapperProps) {
 
   // Generate days based on current view and date range
   const generateViewDays = (view: CalendarView, year: number, range: DateRange | null) => {
+    const today = new Date();
+
     if (view === "custom" && range) {
       const days: Array<{ key: string; date: Date }> = [];
       const start = new Date(range.from);
       const end = new Date(range.to);
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const date = new Date(d);
+        days.push({
+          key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+          date
+        });
+      }
+      return days;
+    } else if (view === "day") {
+      // Show just today
+      const days: Array<{ key: string; date: Date }> = [];
+      days.push({
+        key: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
+        date: new Date(today)
+      });
+      return days;
+    } else if (view === "week") {
+      // Show current week
+      const start = startOfWeek(today);
+      const end = endOfWeek(today);
+      const days: Array<{ key: string; date: Date }> = [];
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const date = new Date(d);
+        days.push({
+          key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+          date
+        });
+      }
+      return days;
+    } else if (view === "month") {
+      // Show current month
+      const start = startOfMonth(today);
+      const end = endOfMonth(today);
+      const days: Array<{ key: string; date: Date }> = [];
 
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const date = new Date(d);
@@ -88,27 +126,23 @@ function CalendarContent(props: CalendarWrapperProps) {
   }, [currentView, currentYear, dateRange]);
 
   useEffect(() => {
-    // Simulate loading events - replace with actual data fetching
-    const loadEvents = async () => {
+    // Simple loading simulation for view changes
+    const loadView = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // For now, we'll start with empty events
-        // In a real app, this would fetch from your API
-        setEvents([]);
+        // Small delay to show loading state on view changes
+        await new Promise(resolve => setTimeout(resolve, 200));
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load events');
+        setError(err instanceof Error ? err.message : 'Failed to load view');
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadEvents();
-  }, [currentYear, currentView, dateRange]); // Reload when view changes
+    loadView();
+  }, [currentView, dateRange]); // Reload when view changes
 
   const handleViewChange = (view: CalendarView) => {
     setCurrentView(view);
@@ -182,7 +216,7 @@ function CalendarContent(props: CalendarWrapperProps) {
           <YearCalendar
             {...props}
             year={currentYear}
-            events={events}
+            events={props.events || []}
             showDaysOfWeek={currentView === "custom" && viewDays.length <= 31}
             customDays={viewDays}
           />
