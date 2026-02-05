@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addWeeks, addMonths, addYears } from "date-fns";
 
 export type CalendarView = "year" | "month" | "week" | "day" | "custom";
 
@@ -20,8 +20,10 @@ interface ViewControlsProps {
   currentYear: number;
   dateRange: DateRange | null;
   isDarkMode: boolean;
+  isLoading?: boolean;
   onViewChange: (view: CalendarView) => void;
-  onYearChange: (year: number) => void;
+  onPreviousPeriod: () => void;
+  onNextPeriod: () => void;
   onDateRangeChange: (range: DateRange | null) => void;
   onToggleDarkMode: () => void;
 }
@@ -31,8 +33,10 @@ export function ViewControls({
   currentYear,
   dateRange,
   isDarkMode,
+  isLoading,
   onViewChange,
-  onYearChange,
+  onPreviousPeriod,
+  onNextPeriod,
   onDateRangeChange,
   onToggleDarkMode,
 }: ViewControlsProps) {
@@ -77,7 +81,7 @@ export function ViewControls({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onYearChange(currentYear - 1)}
+          onClick={onPreviousPeriod}
           disabled={currentView === "custom"}
         >
           <ChevronLeft className="h-4 w-4" />
@@ -88,15 +92,26 @@ export function ViewControls({
           <span className="font-medium">
             {currentView === "custom" && dateRange
               ? `${format(dateRange.from, "MMM d")} - ${format(dateRange.to, "MMM d, yyyy")}`
+              : currentView === "year"
+              ? currentYear
+              : currentView === "month"
+              ? format(new Date(currentYear, new Date().getMonth()), "MMMM yyyy")
+              : currentView === "week"
+              ? `Week of ${format(startOfWeek(new Date()), "MMM d, yyyy")}`
+              : currentView === "day"
+              ? format(new Date(), "MMM d, yyyy")
               : currentYear
             }
           </span>
+          {isLoading && (
+            <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+          )}
         </div>
 
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onYearChange(currentYear + 1)}
+          onClick={onNextPeriod}
           disabled={currentView === "custom"}
         >
           <ChevronRight className="h-4 w-4" />

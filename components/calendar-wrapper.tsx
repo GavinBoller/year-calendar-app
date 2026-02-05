@@ -47,13 +47,12 @@ function CalendarContent(props: CalendarWrapperProps) {
   const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<CalendarView>("year");
   const [currentYear, setCurrentYear] = useState(props.year);
+  const [currentPeriod, setCurrentPeriod] = useState(new Date());
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const { theme, setTheme } = useTheme();
 
   // Generate days based on current view and date range
-  const generateViewDays = (view: CalendarView, year: number, range: DateRange | null) => {
-    const today = new Date();
-
+  const generateViewDays = (view: CalendarView, period: Date, range: DateRange | null) => {
     if (view === "custom" && range) {
       const days: Array<{ key: string; date: Date }> = [];
       const start = new Date(range.from);
@@ -68,17 +67,17 @@ function CalendarContent(props: CalendarWrapperProps) {
       }
       return days;
     } else if (view === "day") {
-      // Show just today
+      // Show the selected day
       const days: Array<{ key: string; date: Date }> = [];
       days.push({
-        key: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
-        date: new Date(today)
+        key: `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}-${String(period.getDate()).padStart(2, '0')}`,
+        date: new Date(period)
       });
       return days;
     } else if (view === "week") {
-      // Show current week
-      const start = startOfWeek(today);
-      const end = endOfWeek(today);
+      // Show the selected week
+      const start = startOfWeek(period);
+      const end = endOfWeek(period);
       const days: Array<{ key: string; date: Date }> = [];
 
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -90,9 +89,9 @@ function CalendarContent(props: CalendarWrapperProps) {
       }
       return days;
     } else if (view === "month") {
-      // Show current month
-      const start = startOfMonth(today);
-      const end = endOfMonth(today);
+      // Show the selected month
+      const start = startOfMonth(period);
+      const end = endOfMonth(period);
       const days: Array<{ key: string; date: Date }> = [];
 
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -105,6 +104,7 @@ function CalendarContent(props: CalendarWrapperProps) {
       return days;
     } else {
       // Default to year view
+      const year = period.getFullYear();
       const start = new Date(year, 0, 1);
       const end = new Date(year + 1, 0, 1);
       const days: Array<{ key: string; date: Date }> = [];
@@ -119,11 +119,11 @@ function CalendarContent(props: CalendarWrapperProps) {
     }
   };
 
-  const [viewDays, setViewDays] = useState(() => generateViewDays("year", props.year, null));
+  const [viewDays, setViewDays] = useState(() => generateViewDays("year", new Date(props.year, 0, 1), null));
 
   useEffect(() => {
-    setViewDays(generateViewDays(currentView, currentYear, dateRange));
-  }, [currentView, currentYear, dateRange]);
+    setViewDays(generateViewDays(currentView, currentPeriod, dateRange));
+  }, [currentView, currentPeriod, dateRange]);
 
   useEffect(() => {
     // Simple loading simulation for view changes
@@ -163,17 +163,37 @@ function CalendarContent(props: CalendarWrapperProps) {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
+  const handlePreviousPeriod = () => {
+    if (currentView === "year") {
+      setCurrentYear(prev => prev - 1);
+    } else if (currentView === "month") {
+      setCurrentPeriod(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    } else if (currentView === "week") {
+      setCurrentPeriod(prev => new Date(prev.getTime() - 7 * 24 * 60 * 60 * 1000));
+    } else if (currentView === "day") {
+      setCurrentPeriod(prev => new Date(prev.getTime() - 24 * 60 * 60 * 1000));
+    }
+  };
+
+  const handleNextPeriod = () => {
+    if (currentView === "year") {
+      setCurrentYear(prev => prev + 1);
+    } else if (currentView === "month") {
+      setCurrentPeriod(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    } else if (currentView === "week") {
+      setCurrentPeriod(prev => new Date(prev.getTime() + 7 * 24 * 60 * 60 * 1000));
+    } else if (currentView === "day") {
+      setCurrentPeriod(prev => new Date(prev.getTime() + 24 * 60 * 60 * 1000));
+    }
+  };
+
   // Mobile gesture handlers
   const mobileGestureHandlers = {
     onSwipeLeft: () => {
-      if (currentView === "year") {
-        setCurrentYear(prev => prev + 1);
-      }
+      handleNextPeriod();
     },
     onSwipeRight: () => {
-      if (currentView === "year") {
-        setCurrentYear(prev => prev - 1);
-      }
+      handlePreviousPeriod();
     },
   };
 
@@ -205,8 +225,10 @@ function CalendarContent(props: CalendarWrapperProps) {
         currentYear={currentYear}
         dateRange={dateRange}
         isDarkMode={theme === "dark"}
+        isLoading={isLoading}
         onViewChange={handleViewChange}
-        onYearChange={handleYearChange}
+        onPreviousPeriod={handlePreviousPeriod}
+        onNextPeriod={handleNextPeriod}
         onDateRangeChange={handleDateRangeChange}
         onToggleDarkMode={handleToggleDarkMode}
       />
