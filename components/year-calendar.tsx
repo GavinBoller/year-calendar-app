@@ -198,6 +198,7 @@ export function YearCalendar({
   const [menuOpen, setMenuOpen] = React.useState<boolean>(false);
   const [hoveredEvent, setHoveredEvent] = React.useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = React.useState<{ x: number; y: number } | null>(null);
+  const [hoveredDayEvents, setHoveredDayEvents] = React.useState<AllDayEvent[] | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
   const editStartDateInputRef = React.useRef<HTMLInputElement | null>(null);
   const editEndDateInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -628,9 +629,40 @@ export function YearCalendar({
                         width,
                       }}
                       className="px-1 pointer-events-auto cursor-pointer"
+                      onMouseEnter={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        // Get all events for this day
+                        const dayKey = days[dayIndex]?.key;
+                        const allDayEvents = dayKey ? dateMap.get(dayKey) || [] : [];
+                        setHoveredDayEvents(allDayEvents);
+                        // Position the popup
+                        const popupWidth = 300;
+                        const popupHeight = Math.min(200, allDayEvents.length * 30 + 40);
+                        const margin = 8;
+
+                        let x = rect.left + rect.width / 2;
+                        let y = rect.top - margin;
+
+                        // Adjust horizontal position
+                        if (x - popupWidth / 2 < margin) {
+                          x = popupWidth / 2 + margin;
+                        } else if (x + popupWidth / 2 > window.innerWidth - margin) {
+                          x = window.innerWidth - popupWidth / 2 - margin;
+                        }
+
+                        // Adjust vertical position
+                        if (y - popupHeight < margin) {
+                          y = rect.bottom + margin;
+                        }
+
+                        setTooltipPosition({ x, y });
+                      }}
+                      onMouseLeave={() => {
+                        setHoveredDayEvents(null);
+                        setTooltipPosition(null);
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        // Could show a tooltip or popover with hidden events
                         onDayClick?.(days[dayIndex]?.key);
                       }}
                     >
@@ -1030,6 +1062,40 @@ export function YearCalendar({
           }}
         >
           {hoveredEvent}
+        </div>
+      )}
+
+      {/* Popup for all events on a day when hovering "+X more" */}
+      {hoveredDayEvents && tooltipPosition && (
+        <div
+          className="fixed z-50 pointer-events-none bg-card border rounded-md shadow-lg max-w-sm"
+          style={{
+            top: tooltipPosition.y,
+            left: tooltipPosition.x,
+            transform: "translateX(-50%) translateY(-100%)",
+          }}
+        >
+          <div className="p-3">
+            <div className="text-sm font-medium mb-2">All Events</div>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {hoveredDayEvents.map((event, index) => (
+                <div key={event.id} className="flex items-start gap-2 text-xs">
+                  <div
+                    className="w-2 h-2 rounded-full mt-0.5 flex-shrink-0"
+                    style={{
+                      backgroundColor: calendarColors[event.calendarId || ""] || "#3174ad",
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{event.summary}</div>
+                    <div className="text-muted-foreground truncate">
+                      {calendarNames[event.calendarId || ""] || "Calendar"}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
