@@ -504,11 +504,19 @@ export function YearCalendar({
                 // Calculate dynamic maximum height based on available cell space
                 const cellBoundaryLimit = cellSizePx.h - (labelOffset + lane * currentLaneHeight) - 15;
                 const textLineHeight = 12; // 12px line height
-                const maxPossibleLines = Math.max(1, Math.floor(Math.max(0, cellBoundaryLimit) / textLineHeight));
-                // Cap at reasonable maximum to prevent excessive wrapping (4-5 lines max)
-                const maxReasonableLines = Math.min(maxPossibleLines, 5);
-                const maxTextHeight = maxReasonableLines * textLineHeight;
-                const maxHeight = Math.max(12, Math.min(Math.max(0, cellBoundaryLimit), maxTextHeight));
+
+                let maxHeight;
+                if (multipleEventsOnDay) {
+                  // For compact spacing, use full lane height for better text fit
+                  maxHeight = currentLaneHeight;
+                } else {
+                  // For normal spacing, use cell boundary calculation
+                  const maxPossibleLines = Math.max(1, Math.floor(Math.max(0, cellBoundaryLimit) / textLineHeight));
+                  // Cap at reasonable maximum to prevent excessive wrapping (4-5 lines max)
+                  const maxReasonableLines = Math.min(maxPossibleLines, 5);
+                  const maxTextHeight = maxReasonableLines * textLineHeight;
+                  maxHeight = Math.max(12, Math.min(Math.max(0, cellBoundaryLimit), maxTextHeight));
+                }
 
                 bars.push(
                   <div
