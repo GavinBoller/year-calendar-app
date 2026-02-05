@@ -451,9 +451,19 @@ export function YearCalendar({
             const laneHeight = 32;
             const compactLaneHeight = 20; // Smaller spacing for multiple events
             const maxLanes = Math.max(
-              2, // Ensure at least 2 events can be shown per day
+              3, // Ensure at least 3 events can be shown per day
               Math.floor((cellSizePx.h - labelOffset - 2) / laneHeight)
             );
+
+            // Count events per day across all rows to determine if text should wrap and show more indicator
+            const eventsPerDay = new Map<number, number>();
+            const shownEventsPerDay = new Map<number, number>();
+            for (const [row, segs] of rowToSegs) {
+              for (const seg of segs) {
+                eventsPerDay.set(seg.startCol, (eventsPerDay.get(seg.startCol) || 0) + 1);
+              }
+            }
+
             for (const [row, segs] of rowToSegs) {
               segs.sort((a, b) => {
                 // Sort by start column first
@@ -463,12 +473,6 @@ export function YearCalendar({
                 // Then by event ID for stable sorting
                 return a.ev.id.localeCompare(b.ev.id);
               });
-
-              // Count events per day (same startCol) to determine if text should wrap
-              const eventsPerDay = new Map<number, number>();
-              for (const seg of segs) {
-                eventsPerDay.set(seg.startCol, (eventsPerDay.get(seg.startCol) || 0) + 1);
-              }
 
               const laneEnds: number[] = [];
               for (const seg of segs) {
@@ -482,6 +486,9 @@ export function YearCalendar({
                 if (lane >= maxLanes) continue;
                 if (lane === laneEnds.length) laneEnds.push(seg.endCol);
                 else laneEnds[lane] = seg.endCol;
+
+                // Count shown events per day
+                shownEventsPerDay.set(seg.startCol, (shownEventsPerDay.get(seg.startCol) || 0) + 1);
                 const left = pad + seg.startCol * (cellSizePx.w + gap);
 
                 // Check if there are multiple events on this day
@@ -590,6 +597,55 @@ export function YearCalendar({
                 );
               }
             }
+
+            // Add "more" indicators for days with hidden events
+            for (const [row, segs] of rowToSegs) {
+              const processedDays = new Set<number>();
+              for (const seg of segs) {
+                if (processedDays.has(seg.startCol)) continue;
+                processedDays.add(seg.startCol);
+
+                const totalEvents = eventsPerDay.get(seg.startCol) || 0;
+                const shownEvents = shownEventsPerDay.get(seg.startCol) || 0;
+                const hiddenEvents = totalEvents - shownEvents;
+
+                if (hiddenEvents > 0) {
+                  const left = pad + seg.startCol * (cellSizePx.w + gap);
+                  const top = pad + row * (cellSizePx.h + gap) + labelOffset + (shownEvents * compactLaneHeight);
+                  const width = cellSizePx.w;
+
+                  bars.push(
+                    <div
+                      key={`more-${row}-${seg.startCol}`}
+                      style={{
+                        position: "absolute",
+                        left,
+                        top,
+                        width,
+                      }}
+                      className="px-1 pointer-events-auto cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Could show a tooltip or popover with hidden events
+                        onDayClick?.(days[seg.startCol]?.key);
+                      }}
+                    >
+                      <div
+                        className="rounded-sm px-1 text-[9px] leading-[10px] text-white/80 text-center"
+                        style={{
+                          backgroundColor: "rgba(0,0,0,0.6)",
+                          lineHeight: '10px',
+                          maxHeight: '12px',
+                        }}
+                      >
+                        +{hiddenEvents} more
+                      </div>
+                    </div>
+                  );
+                }
+              }
+            }
+
             return bars;
           }, [
             events,
