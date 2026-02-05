@@ -460,7 +460,9 @@ export function YearCalendar({
             const shownEventsPerDay = new Map<number, number>();
             for (const [row, segs] of rowToSegs) {
               for (const seg of segs) {
-                eventsPerDay.set(seg.startCol, (eventsPerDay.get(seg.startCol) || 0) + 1);
+                // Use absolute day index as key: row * cols + startCol
+                const dayIndex = row * cols + seg.startCol;
+                eventsPerDay.set(dayIndex, (eventsPerDay.get(dayIndex) || 0) + 1);
               }
             }
 
@@ -488,11 +490,12 @@ export function YearCalendar({
                 else laneEnds[lane] = seg.endCol;
 
                 // Count shown events per day
-                shownEventsPerDay.set(seg.startCol, (shownEventsPerDay.get(seg.startCol) || 0) + 1);
+                const dayIndex = row * cols + seg.startCol;
+                shownEventsPerDay.set(dayIndex, (shownEventsPerDay.get(dayIndex) || 0) + 1);
                 const left = pad + seg.startCol * (cellSizePx.w + gap);
 
                 // Check if there are multiple events on this day
-                const multipleEventsOnDay = (eventsPerDay.get(seg.startCol) || 0) >= 2;
+                const multipleEventsOnDay = (eventsPerDay.get(dayIndex) || 0) >= 2;
 
                 // Use compact spacing for multiple events on the same day
                 const currentLaneHeight = multipleEventsOnDay ? compactLaneHeight : laneHeight;
@@ -602,11 +605,12 @@ export function YearCalendar({
             for (const [row, segs] of rowToSegs) {
               const processedDays = new Set<number>();
               for (const seg of segs) {
-                if (processedDays.has(seg.startCol)) continue;
-                processedDays.add(seg.startCol);
+                const dayIndex = row * cols + seg.startCol;
+                if (processedDays.has(dayIndex)) continue;
+                processedDays.add(dayIndex);
 
-                const totalEvents = eventsPerDay.get(seg.startCol) || 0;
-                const shownEvents = shownEventsPerDay.get(seg.startCol) || 0;
+                const totalEvents = eventsPerDay.get(dayIndex) || 0;
+                const shownEvents = shownEventsPerDay.get(dayIndex) || 0;
                 const hiddenEvents = totalEvents - shownEvents;
 
                 if (hiddenEvents > 0) {
@@ -627,7 +631,7 @@ export function YearCalendar({
                       onClick={(e) => {
                         e.stopPropagation();
                         // Could show a tooltip or popover with hidden events
-                        onDayClick?.(days[seg.startCol]?.key);
+                        onDayClick?.(days[dayIndex]?.key);
                       }}
                     >
                       <div
