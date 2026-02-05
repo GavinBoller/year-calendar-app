@@ -74,12 +74,6 @@ export function ViewControls({
 
   const handleCustomRange = (range: { from?: Date; to?: Date } | undefined) => {
     setCurrentRangeSelection(range);
-    if (range?.from && range?.to) {
-      onDateRangeChange({ from: range.from, to: range.to });
-      onViewChange("custom");
-      setIsDatePickerOpen(false);
-      setCurrentRangeSelection(undefined);
-    }
   };
 
   return (
@@ -154,13 +148,33 @@ export function ViewControls({
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0 bg-background border shadow-lg" align="start">
-              <CalendarComponent
-                mode="range"
-                selected={currentRangeSelection as any}
-                onSelect={handleCustomRange}
-                numberOfMonths={2}
-                disabled={(date) => date < new Date("1900-01-01")}
-              />
+              <div className="p-3">
+                <CalendarComponent
+                  mode="range"
+                  selected={currentRangeSelection as any}
+                  onSelect={handleCustomRange}
+                  numberOfMonths={2}
+                  disabled={(date) => date < new Date("1900-01-01")}
+                />
+                {currentRangeSelection?.from && (
+                  <div className="flex justify-end mt-4 pt-3 border-t">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (currentRangeSelection?.from && currentRangeSelection?.to) {
+                          onDateRangeChange({ from: currentRangeSelection.from, to: currentRangeSelection.to });
+                          onViewChange("custom");
+                          setIsDatePickerOpen(false);
+                          setCurrentRangeSelection(undefined);
+                        }
+                      }}
+                      disabled={!currentRangeSelection?.to}
+                    >
+                      Done
+                    </Button>
+                  </div>
+                )}
+              </div>
             </PopoverContent>
           </Popover>
         )}
