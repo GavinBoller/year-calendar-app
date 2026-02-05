@@ -62,9 +62,9 @@ export function ViewControls({
     onViewChange("custom");
   };
 
-  const handleCustomRange = (range: DateRange | undefined) => {
+  const handleCustomRange = (range: { from?: Date; to?: Date } | undefined) => {
     if (range?.from && range?.to) {
-      onDateRangeChange(range);
+      onDateRangeChange({ from: range.from, to: range.to });
       onViewChange("custom");
       setIsDatePickerOpen(false);
     }
