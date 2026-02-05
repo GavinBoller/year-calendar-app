@@ -199,6 +199,7 @@ export function YearCalendar({
   const [hoveredEvent, setHoveredEvent] = React.useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = React.useState<{ x: number; y: number } | null>(null);
   const [hoveredDayEvents, setHoveredDayEvents] = React.useState<AllDayEvent[] | null>(null);
+  const [popupPosition, setPopupPosition] = React.useState<{ x: number; y: number; showAbove: boolean } | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
   const editStartDateInputRef = React.useRef<HTMLInputElement | null>(null);
   const editEndDateInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -641,7 +642,6 @@ export function YearCalendar({
                         const margin = 8;
 
                         let x = rect.left + rect.width / 2;
-                        let y = rect.top - margin;
 
                         // Adjust horizontal position
                         if (x - popupWidth / 2 < margin) {
@@ -650,16 +650,43 @@ export function YearCalendar({
                           x = window.innerWidth - popupWidth / 2 - margin;
                         }
 
-                        // Adjust vertical position
-                        if (y - popupHeight < margin) {
+                        // Check if we can show above (preferred)
+                        const spaceAbove = rect.top - margin;
+                        const canShowAbove = spaceAbove >= popupHeight + margin;
+
+                        // Check if we can show below
+                        const spaceBelow = window.innerHeight - rect.bottom - margin;
+                        const canShowBelow = spaceBelow >= popupHeight + margin;
+
+                        let y: number;
+                        let showAbove: boolean;
+
+                        if (canShowAbove) {
+                          // Show above (preferred)
+                          y = rect.top - margin;
+                          showAbove = true;
+                        } else if (canShowBelow) {
+                          // Show below
                           y = rect.bottom + margin;
+                          showAbove = false;
+                        } else {
+                          // Neither fits perfectly, choose the one with more space
+                          if (spaceAbove >= spaceBelow) {
+                            // Show above even if cropped
+                            y = rect.top - margin;
+                            showAbove = true;
+                          } else {
+                            // Show below even if cropped
+                            y = rect.bottom + margin;
+                            showAbove = false;
+                          }
                         }
 
-                        setTooltipPosition({ x, y });
+                        setPopupPosition({ x, y, showAbove });
                       }}
                       onMouseLeave={() => {
                         setHoveredDayEvents(null);
-                        setTooltipPosition(null);
+                        setPopupPosition(null);
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1066,13 +1093,15 @@ export function YearCalendar({
       )}
 
       {/* Popup for all events on a day when hovering "+X more" */}
-      {hoveredDayEvents && tooltipPosition && (
+      {hoveredDayEvents && popupPosition && (
         <div
           className="fixed z-50 pointer-events-none bg-card border rounded-md shadow-lg max-w-sm"
           style={{
-            top: tooltipPosition.y,
-            left: tooltipPosition.x,
-            transform: "translateX(-50%) translateY(-100%)",
+            top: popupPosition.y,
+            left: popupPosition.x,
+            transform: popupPosition.showAbove
+              ? "translateX(-50%) translateY(-100%)"
+              : "translateX(-50%) translateY(0%)",
           }}
         >
           <div className="p-3">
