@@ -129,6 +129,13 @@ function CalendarContent(props: CalendarWrapperProps) {
     setViewDays(generateViewDays(currentView, currentPeriod, dateRange));
   }, [currentView, currentPeriod, dateRange]);
 
+  // Update currentPeriod when currentYear changes in year view
+  useEffect(() => {
+    if (currentView === "year") {
+      setCurrentPeriod(new Date(currentYear, 0, 1));
+    }
+  }, [currentYear, currentView]);
+
   useEffect(() => {
     // Simple loading simulation for view changes
     const loadView = async () => {
