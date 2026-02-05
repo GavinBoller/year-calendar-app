@@ -449,6 +449,7 @@ export function YearCalendar({
             const bars: Array<React.ReactElement> = [];
             const labelOffset = 16;
             const laneHeight = 32;
+            const compactLaneHeight = 20; // Smaller spacing for multiple events
             const maxLanes = Math.max(
               2, // Ensure at least 2 events can be shown per day
               Math.floor((cellSizePx.h - labelOffset - 2) / laneHeight)
@@ -482,11 +483,13 @@ export function YearCalendar({
                 if (lane === laneEnds.length) laneEnds.push(seg.endCol);
                 else laneEnds[lane] = seg.endCol;
                 const left = pad + seg.startCol * (cellSizePx.w + gap);
+                // Use compact spacing for multiple events on the same day
+                const currentLaneHeight = multipleEventsOnDay ? compactLaneHeight : laneHeight;
                 const top =
                   pad +
                   row * (cellSizePx.h + gap) +
                   labelOffset +
-                  lane * laneHeight;
+                  lane * currentLaneHeight;
                 const span = seg.endCol - seg.startCol;
                 const width = span * cellSizePx.w + (span - 1) * gap;
                 const key = `${seg.ev.id}:${row}:${seg.startCol}-${seg.endCol}:${lane}`;
@@ -498,7 +501,7 @@ export function YearCalendar({
                 const multipleEventsOnDay = (eventsPerDay.get(seg.startCol) || 0) >= 2;
 
                 // Calculate dynamic maximum height based on available cell space
-                const cellBoundaryLimit = cellSizePx.h - (labelOffset + lane * laneHeight) - 15;
+                const cellBoundaryLimit = cellSizePx.h - (labelOffset + lane * currentLaneHeight) - 15;
                 const textLineHeight = 12; // 12px line height
                 const maxPossibleLines = Math.max(1, Math.floor(Math.max(0, cellBoundaryLimit) / textLineHeight));
                 // Cap at reasonable maximum to prevent excessive wrapping (4-5 lines max)
@@ -563,7 +566,7 @@ export function YearCalendar({
                         // Disable text wrapping if multiple events on the same day
                         multipleEventsOnDay ? "whitespace-nowrap truncate" : "whitespace-normal break-words",
                         // Add horizontal separator for events in higher lanes
-                        lane > 0 && "border-t border-white/20"
+                        lane > 0 && "border-t-2 border-white/30"
                       )}
                       style={{
                         backgroundColor: bg || "#3174ad",
