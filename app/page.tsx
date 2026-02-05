@@ -88,7 +88,7 @@ export default function HomePage() {
   const createDateFromDayClick = useRef<string | null>(null);
   const startDateInputRef = useRef<HTMLInputElement | null>(null);
   const endDateInputRef = useRef<HTMLInputElement | null>(null);
-  const preferencesLoaded = useRef<boolean>(false);
+  const [preferencesLoaded, setPreferencesLoaded] = useState<boolean>(false);
 
   const mergeCalendarColorsWithDefaults = (
     calendars: CalendarListItem[],
@@ -245,8 +245,8 @@ export default function HomePage() {
 
   // Load preferences from server when authenticated
   useEffect(() => {
-    if (status === "authenticated" && !preferencesLoaded.current) {
-      preferencesLoaded.current = true;
+    if (status === "authenticated" && !preferencesLoaded) {
+      setPreferencesLoaded(true);
       fetch("/api/preferences")
         .then((res) => res.json())
         .then((data) => {
@@ -268,13 +268,13 @@ export default function HomePage() {
         })
         .catch((err) => {
           console.error("Failed to load preferences:", err);
-          preferencesLoaded.current = false;
+          setPreferencesLoaded(false);
         });
     } else if (status !== "authenticated") {
-      preferencesLoaded.current = false;
+      setPreferencesLoaded(false);
       setIsLoading(false);
     }
-  }, [status]);
+  }, [status, preferencesLoaded]);
 
   const visibleEvents = useMemo(() => {
     if (showHidden) return events;
@@ -282,7 +282,7 @@ export default function HomePage() {
   }, [events, hiddenEventIds, showHidden]);
 
   useEffect(() => {
-    if (status !== "authenticated") {
+    if (status !== "authenticated" || !preferencesLoaded) {
       setEvents([]);
       return;
     }
@@ -338,7 +338,7 @@ export default function HomePage() {
         );
         setEventsLoaded(true); // Still mark as loaded even on error
       });
-  }, [status, year, selectedCalendarIds]);
+  }, [status, year, selectedCalendarIds, preferencesLoaded]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -401,7 +401,7 @@ export default function HomePage() {
             list,
             selectedCalendarIds,
             allIds,
-            preferencesLoaded.current
+            preferencesLoaded
           );
           // Only update if selection actually changed
           if (
@@ -414,7 +414,7 @@ export default function HomePage() {
 
         // Only update calendar colors if preferences haven't been loaded yet
         // (to avoid overriding saved user preferences with defaults)
-        if (!preferencesLoaded.current) {
+        if (!preferencesLoaded) {
           const next = mergeCalendarColorsWithDefaults(list, calendarColors);
           if (JSON.stringify(next) !== JSON.stringify(calendarColors)) {
             setCalendarColors(next);
@@ -486,7 +486,7 @@ export default function HomePage() {
 
   // Persist preferences to server whenever they change
   useEffect(() => {
-    if (status === "authenticated" && preferencesLoaded.current) {
+    if (status === "authenticated" && preferencesLoaded) {
       // Debounce API calls to avoid too many requests
       const timeoutId = setTimeout(() => {
         fetch("/api/preferences", {
@@ -512,6 +512,7 @@ export default function HomePage() {
     showDaysOfWeek,
     showHidden,
     calendarColors,
+    preferencesLoaded,
   ]);
 
   const onPrev = () => setYear((y) => y - 1);
@@ -1109,7 +1110,7 @@ export default function HomePage() {
                       setHiddenEventIds([]);
                       setShowDaysOfWeek(false);
                       setShowHidden(false);
-                      preferencesLoaded.current = false;
+                      setPreferencesLoaded(false);
                       // Clear localStorage
                       try {
                         localStorage.clear();
