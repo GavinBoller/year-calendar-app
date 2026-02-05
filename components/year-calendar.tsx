@@ -462,6 +462,13 @@ export function YearCalendar({
                 // Then by event ID for stable sorting
                 return a.ev.id.localeCompare(b.ev.id);
               });
+
+              // Count events per day (same startCol) to determine if text should wrap
+              const eventsPerDay = new Map<number, number>();
+              for (const seg of segs) {
+                eventsPerDay.set(seg.startCol, (eventsPerDay.get(seg.startCol) || 0) + 1);
+              }
+
               const laneEnds: number[] = [];
               for (const seg of segs) {
                 let lane = 0;
@@ -486,6 +493,10 @@ export function YearCalendar({
                 const bg = seg.ev.calendarId
                   ? calendarColors[seg.ev.calendarId]
                   : undefined;
+
+                // Check if there are multiple events on this day
+                const multipleEventsOnDay = (eventsPerDay.get(seg.startCol) || 0) >= 2;
+
                 // Calculate dynamic maximum height based on available cell space
                 const cellBoundaryLimit = cellSizePx.h - (labelOffset + lane * laneHeight) - 15;
                 const textLineHeight = 12; // 12px line height
@@ -547,7 +558,13 @@ export function YearCalendar({
                     }}
                   >
                     <div
-                      className="whitespace-normal break-words rounded-sm px-1 text-[10px] leading-[12px] shadow-sm overflow-hidden"
+                      className={cn(
+                        "rounded-sm px-1 text-[10px] leading-[12px] shadow-sm overflow-hidden",
+                        // Disable text wrapping if multiple events on the same day
+                        multipleEventsOnDay ? "whitespace-nowrap truncate" : "whitespace-normal break-words",
+                        // Add horizontal separator for events in higher lanes
+                        lane > 0 && "border-t border-white/20"
+                      )}
                       style={{
                         backgroundColor: bg || "#3174ad",
                         color: "#ffffff",
