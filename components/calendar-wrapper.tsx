@@ -1,5 +1,6 @@
 "use client";
 
+// Calendar wrapper with Phase 2 UX improvements: view switching, dark mode, mobile gestures, date range selection
 import React, { useState, useEffect } from "react";
 import { ErrorBoundary } from "./error-boundary";
 import { LoadingState, CalendarSkeleton } from "./loading-state";
