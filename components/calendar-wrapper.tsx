@@ -4,7 +4,16 @@ import React, { useState, useEffect } from "react";
 import { ErrorBoundary } from "./error-boundary";
 import { LoadingState, CalendarSkeleton } from "./loading-state";
 import { YearCalendar } from "./year-calendar";
+import { ViewControls, CalendarView } from "./view-controls";
+import { ThemeProvider, useTheme } from "./theme-provider";
+import { MobileGestures } from "./mobile-gestures";
 import { AllDayEvent, CalendarListItem } from "@/types/calendar";
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, differenceInDays } from "date-fns";
+
+interface DateRange {
+  from: Date;
+  to: Date;
+}
 
 interface CalendarWrapperProps {
   year: number;
@@ -31,10 +40,51 @@ interface CalendarWrapperProps {
   showDaysOfWeek?: boolean;
 }
 
-export function CalendarWrapper(props: CalendarWrapperProps) {
+function CalendarContent(props: CalendarWrapperProps) {
   const [events, setEvents] = useState<AllDayEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<CalendarView>("year");
+  const [currentYear, setCurrentYear] = useState(props.year);
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const { theme, setTheme } = useTheme();
+
+  // Generate days based on current view and date range
+  const generateViewDays = (view: CalendarView, year: number, range: DateRange | null) => {
+    if (view === "custom" && range) {
+      const days: Array<{ key: string; date: Date }> = [];
+      const start = new Date(range.from);
+      const end = new Date(range.to);
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const date = new Date(d);
+        days.push({
+          key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+          date
+        });
+      }
+      return days;
+    } else {
+      // Default to year view
+      const start = new Date(year, 0, 1);
+      const end = new Date(year + 1, 0, 1);
+      const days: Array<{ key: string; date: Date }> = [];
+      for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+        const date = new Date(d);
+        days.push({
+          key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+          date
+        });
+      }
+      return days;
+    }
+  };
+
+  const [viewDays, setViewDays] = useState(() => generateViewDays("year", props.year, null));
+
+  useEffect(() => {
+    setViewDays(generateViewDays(currentView, currentYear, dateRange));
+  }, [currentView, currentYear, dateRange]);
 
   useEffect(() => {
     // Simulate loading events - replace with actual data fetching
@@ -57,7 +107,40 @@ export function CalendarWrapper(props: CalendarWrapperProps) {
     };
 
     loadEvents();
-  }, [props.year]); // Reload when year changes
+  }, [currentYear, currentView, dateRange]); // Reload when view changes
+
+  const handleViewChange = (view: CalendarView) => {
+    setCurrentView(view);
+    if (view !== "custom") {
+      setDateRange(null);
+    }
+  };
+
+  const handleYearChange = (year: number) => {
+    setCurrentYear(year);
+  };
+
+  const handleDateRangeChange = (range: DateRange | null) => {
+    setDateRange(range);
+  };
+
+  const handleToggleDarkMode = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
+
+  // Mobile gesture handlers
+  const mobileGestureHandlers = {
+    onSwipeLeft: () => {
+      if (currentView === "year") {
+        setCurrentYear(prev => prev + 1);
+      }
+    },
+    onSwipeRight: () => {
+      if (currentView === "year") {
+        setCurrentYear(prev => prev - 1);
+      }
+    },
+  };
 
   if (isLoading) {
     return <CalendarSkeleton />;
@@ -81,11 +164,39 @@ export function CalendarWrapper(props: CalendarWrapperProps) {
   }
 
   return (
-    <ErrorBoundary>
-      <YearCalendar
-        {...props}
-        events={events}
+    <div className="h-screen flex flex-col bg-background">
+      <ViewControls
+        currentView={currentView}
+        currentYear={currentYear}
+        dateRange={dateRange}
+        isDarkMode={theme === "dark"}
+        onViewChange={handleViewChange}
+        onYearChange={handleYearChange}
+        onDateRangeChange={handleDateRangeChange}
+        onToggleDarkMode={handleToggleDarkMode}
       />
-    </ErrorBoundary>
+
+      <div className="flex-1 overflow-hidden">
+        <MobileGestures handlers={mobileGestureHandlers} className="h-full">
+          <YearCalendar
+            {...props}
+            year={currentYear}
+            events={events}
+            showDaysOfWeek={currentView === "custom" && viewDays.length <= 31}
+            customDays={viewDays}
+          />
+        </MobileGestures>
+      </div>
+    </div>
+  );
+}
+
+export function CalendarWrapper(props: CalendarWrapperProps) {
+  return (
+    <ThemeProvider defaultTheme="system" storageKey="calendar-theme">
+      <ErrorBoundary>
+        <CalendarContent {...props} />
+      </ErrorBoundary>
+    </ThemeProvider>
   );
 }

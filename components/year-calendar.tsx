@@ -21,6 +21,8 @@ import {
   SelectGroup,
   SelectLabel,
 } from "@/components/ui/select";
+import { CalendarView } from "./view-controls";
+import { MobileGestures } from "./mobile-gestures";
 
 export type { AllDayEvent, CalendarListItem };
 function expandEventsToDateMap(events: AllDayEvent[]) {
@@ -140,6 +142,7 @@ export function YearCalendar({
   writableCalendars = [],
   writableAccountsWithCalendars = [],
   showDaysOfWeek = false,
+  customDays,
 }: {
   year: number;
   events: AllDayEvent[];
@@ -164,6 +167,7 @@ export function YearCalendar({
     list: CalendarListItem[];
   }>;
   showDaysOfWeek?: boolean;
+  customDays?: Array<{ key: string; date: Date }>;
 }) {
   const [todayKey, setTodayKey] = React.useState<string>("");
 
@@ -172,7 +176,7 @@ export function YearCalendar({
     setTodayKey(formatDateKey(new Date()));
   }, []);
   const dateMap = useMemo(() => expandEventsToDateMap(events), [events]);
-  const days = useMemo(() => generateYearDays(year), [year]);
+  const days = useMemo(() => customDays || generateYearDays(year), [customDays, year]);
   const dayIndexByKey = useMemo(() => {
     const map = new Map<string, number>();
     days.forEach((d, i) => map.set(d.key, i));
