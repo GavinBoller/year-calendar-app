@@ -1107,9 +1107,9 @@ export function YearCalendar({
         >
           <div className="p-3">
             <div className="text-sm font-medium mb-2">
-              {hoveredDayEvents.date.toLocaleDateString('en-US', {
-                weekday: 'short',
-                day: 'numeric',
+              {hoveredDayEvents.date.toLocaleDateString('en-GB', {
+                weekday: 'short'
+              })} {hoveredDayEvents.date.getDate()} {hoveredDayEvents.date.toLocaleDateString('en-GB', {
                 month: 'short'
               })} - All Events
             </div>
