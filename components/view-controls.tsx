@@ -49,17 +49,27 @@ export function ViewControls({
   const [currentRangeSelection, setCurrentRangeSelection] = useState<{ from?: Date; to?: Date } | undefined>(undefined);
 
   const handleQuickRange = (range: "week" | "month" | "year") => {
+    const today = new Date();
+    let from: Date;
+    let to: Date;
+
     switch (range) {
       case "week":
-        onViewChange("week");
+        from = startOfWeek(today);
+        to = endOfWeek(today);
         break;
       case "month":
-        onViewChange("month");
+        from = startOfMonth(today);
+        to = endOfMonth(today);
         break;
       case "year":
-        onViewChange("year");
+        from = startOfYear(today);
+        to = endOfYear(today);
         break;
     }
+
+    onDateRangeChange({ from, to });
+    onViewChange("custom");
   };
 
   const handleCustomRange = (range: { from?: Date; to?: Date } | undefined) => {
