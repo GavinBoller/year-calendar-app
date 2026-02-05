@@ -286,6 +286,11 @@ export default function HomePage() {
       setEvents([]);
       return;
     }
+    // Don't fetch if no calendars selected, but don't clear events
+    if (selectedCalendarIds.length === 0) {
+      setEventsLoaded(true);
+      return;
+    }
     // Reset loading state when starting a new fetch
     setEventsLoaded(false);
 
