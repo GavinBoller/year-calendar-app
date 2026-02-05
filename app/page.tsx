@@ -286,44 +286,58 @@ export default function HomePage() {
       setEvents([]);
       return;
     }
-    console.log(`Fetching events for year=${year}, calendars=${selectedCalendarIds.join(',')}`);
-    const controller = new AbortController();
-    const qs = `/api/events?year=${year}${
-      selectedCalendarIds.length
-        ? `&calendarIds=${encodeURIComponent(selectedCalendarIds.join(","))}`
-        : ""
-    }`;
-    fetch(qs, { cache: "no-store", signal: controller.signal })
-      .then((res) => res.json())
-      .then((data) => {
-        if (!controller.signal.aborted) {
-          console.log(`Received ${data.events?.length || 0} events`);
-          setEvents(prevEvents => {
-            const newEvents = data.events || [];
-            // Keep events from calendars that are still selected but not in newEvents (failed fetches)
-            const prevFromSelected = prevEvents.filter(e =>
-              selectedCalendarIds.some(id => e.calendarId && e.calendarId.includes(id))
-            );
-            // Combine and deduplicate by id
-            const all = [...prevFromSelected, ...newEvents];
-            const unique = all.filter((e, i, arr) => arr.findIndex(x => x.id === e.id) === i);
-            return [...unique]; // Force new array reference for re-render
-          });
-          setEventsLoaded(true);
-        }
+    // Reset loading state when starting a new fetch
+    setEventsLoaded(false);
+
+    // Fetch events for a range of years to show events from nearby years when navigating
+    const yearsToFetch = [year - 1, year, year + 1];
+    console.log(`Fetching events for years=${yearsToFetch.join(',')}, calendars=${selectedCalendarIds.join(',')}`);
+
+    const fetchPromises = yearsToFetch.map(fetchYear => {
+      const controller = new AbortController();
+      const qs = `/api/events?year=${fetchYear}${
+        selectedCalendarIds.length
+          ? `&calendarIds=${encodeURIComponent(selectedCalendarIds.join(","))}`
+          : ""
+      }`;
+      return fetch(qs, { cache: "no-store", signal: controller.signal })
+        .then((res) => res.json())
+        .then((data) => {
+          console.log(`Received ${data.events?.length || 0} events for year ${fetchYear}`);
+          return data.events || [];
+        })
+        .catch((err) => {
+          console.log(`Error fetching events for year ${fetchYear}:`, err);
+          return [];
+        });
+    });
+
+    Promise.all(fetchPromises)
+      .then((results) => {
+        const allEvents = results.flat();
+        console.log(`Total events received: ${allEvents.length}`);
+        setEvents(prevEvents => {
+          // Keep events from calendars that are still selected but not in newEvents (failed fetches)
+          const prevFromSelected = prevEvents.filter(e =>
+            selectedCalendarIds.some(id => e.calendarId && e.calendarId.includes(id))
+          );
+          // Combine and deduplicate by id
+          const all = [...prevFromSelected, ...allEvents];
+          const unique = all.filter((e, i, arr) => arr.findIndex(x => x.id === e.id) === i);
+          return [...unique]; // Force new array reference for re-render
+        });
+        setEventsLoaded(true);
       })
       .catch((err) => {
-        if (!controller.signal.aborted) {
-          console.log('Error fetching events:', err);
-          // On error, keep existing events but filter to selected calendars
-          setEvents(prevEvents =>
-            prevEvents.filter(e =>
-              selectedCalendarIds.some(id => e.calendarId && e.calendarId.includes(id))
-            )
-          );
-        }
+        console.log('Error fetching events:', err);
+        // On error, keep existing events but filter to selected calendars
+        setEvents(prevEvents =>
+          prevEvents.filter(e =>
+            selectedCalendarIds.some(id => e.calendarId && e.calendarId.includes(id))
+          )
+        );
+        setEventsLoaded(true); // Still mark as loaded even on error
       });
-    return () => controller.abort();
   }, [status, year, selectedCalendarIds]);
 
   useEffect(() => {
