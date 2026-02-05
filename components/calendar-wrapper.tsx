@@ -197,27 +197,6 @@ function CalendarContent(props: CalendarWrapperProps) {
     },
   };
 
-  if (isLoading) {
-    return <CalendarSkeleton />;
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px] p-8">
-        <div className="text-center space-y-4 max-w-md">
-          <div className="text-lg font-semibold text-destructive">Failed to load calendar</div>
-          <p className="text-sm text-muted-foreground">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-          >
-            Try again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="h-screen flex flex-col bg-background">
       <ViewControls
@@ -234,15 +213,32 @@ function CalendarContent(props: CalendarWrapperProps) {
       />
 
       <div className="flex-1 overflow-hidden">
-        <MobileGestures handlers={mobileGestureHandlers} className="h-full">
-          <YearCalendar
-            {...props}
-            year={currentYear}
-            events={props.events || []}
-            showDaysOfWeek={currentView === "custom" && viewDays.length <= 31}
-            customDays={viewDays}
-          />
-        </MobileGestures>
+        {isLoading ? (
+          <CalendarSkeleton />
+        ) : error ? (
+          <div className="flex items-center justify-center min-h-[400px] p-8">
+            <div className="text-center space-y-4 max-w-md">
+              <div className="text-lg font-semibold text-destructive">Failed to load calendar</div>
+              <p className="text-sm text-muted-foreground">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        ) : (
+          <MobileGestures handlers={mobileGestureHandlers} className="h-full">
+            <YearCalendar
+              {...props}
+              year={currentYear}
+              events={props.events || []}
+              showDaysOfWeek={currentView === "custom" && viewDays.length <= 31}
+              customDays={viewDays}
+            />
+          </MobileGestures>
+        )}
       </div>
     </div>
   );
