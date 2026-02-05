@@ -389,6 +389,152 @@ export function YearCalendar({
     return `${left} – ${right}`;
   }
 
+  // Special handling for day view - single large cell
+  if (days.length === 1) {
+    const { key, date } = days[0];
+    const isToday = key === todayKey;
+    const dayEvents = dateMap.get(key) || [];
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    const isPastDate = todayKey && key < todayKey;
+
+    return (
+      <div className="h-full w-full overflow-hidden">
+        <div className="relative h-full w-full flex items-center justify-center p-4">
+          <div
+            className={cn(
+              "w-full max-w-2xl h-full max-h-[600px] bg-background border rounded-lg p-6 overflow-hidden",
+              isWeekend &&
+                'bg-white before:content-[""] before:absolute before:inset-0 before:bg-[rgba(0,0,0,0.02)] before:pointer-events-none before:rounded-lg',
+              isPastDate && "bg-slate-100/20 dark:bg-slate-800/20",
+              isToday && "ring-2 ring-primary"
+            )}
+            onClick={(e) => {
+              onDayClick?.(key);
+            }}
+          >
+            {/* Day header */}
+            <div className="text-center mb-6">
+              <div className="text-2xl font-bold text-foreground">
+                {date.toLocaleDateString('en-US', { weekday: 'long' })}
+              </div>
+              <div className="text-lg text-muted-foreground">
+                {date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </div>
+            </div>
+
+            {/* Events list */}
+            <div className="space-y-3 overflow-y-auto max-h-full">
+              {dayEvents.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  No events on this day
+                </div>
+              ) : (
+                dayEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="p-4 rounded-lg border bg-card cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Open event popover
+                      setPopover({
+                        event,
+                        x: window.innerWidth / 2,
+                        y: window.innerHeight / 2,
+                      });
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="w-4 h-4 rounded-full mt-1 flex-shrink-0"
+                        style={{
+                          backgroundColor: calendarColors[event.calendarId || ""] || "#3174ad",
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-foreground break-words">
+                          {event.summary}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {calendarNames[event.calendarId || ""] || "Calendar"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Event popover for day view */}
+        <EventPopover
+          event={popover.event}
+          x={popover.x}
+          y={popover.y}
+          calendarColors={calendarColors}
+          calendarNames={calendarNames}
+          calendarAccounts={calendarAccounts}
+          writableCalendars={writableCalendars}
+          writableAccountsWithCalendars={writableAccountsWithCalendars}
+          onClose={() => setPopover({ event: null, x: 0, y: 0 })}
+          onHideEvent={onHideEvent}
+          onDeleteEvent={onDeleteEvent}
+          onUpdateEvent={onUpdateEvent}
+        />
+
+        {/* Sign-in overlay for day view */}
+        {!signedIn && (
+          <div className="fixed inset-0 flex items-center justify-center bg-background/70">
+            <div className="w-[400px] max-w-[80vw] rounded-md border bg-card p-5 md:p-12 text-center shadow-sm pointer-events-auto">
+              <div className="text-lg font-medium mb-1">Big Year</div>
+              <div className="text-sm text-muted-foreground mb-4">
+                A calendar for all-day events.
+              </div>
+              <div className="space-y-2">
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    const callbackUrl =
+                      typeof window !== "undefined" ? window.location.href : "/";
+                    signIn("google", { callbackUrl });
+                  }}
+                >
+                  Sign in with Google
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    const callbackUrl =
+                      typeof window !== "undefined" ? window.location.href : "/";
+                    signIn("azure-ad", { callbackUrl });
+                  }}
+                >
+                  Sign in with Microsoft
+                </Button>
+              </div>
+              <div className="mt-6 flex items-center justify-center gap-3 text-xs text-muted-foreground">
+                <Link
+                  href="/privacy"
+                  className="hover:text-foreground transition-colors"
+                >
+                  Privacy Policy
+                </Link>
+                <span>•</span>
+                <Link
+                  href="/terms"
+                  className="hover:text-foreground transition-colors"
+                >
+                  Terms of Service
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        return;
+      }
+
   return (
     <div className="h-full w-full overflow-hidden">
       <div className="relative h-full w-full">
